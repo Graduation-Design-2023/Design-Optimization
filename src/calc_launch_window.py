@@ -21,5 +21,5 @@ if __name__ == '__main__':
     venus_calculator = TrajectoryCalculator("Venus")
 
     earth_mars = PlanetsTransOrbit(earth, mars)
-    res = earth_mars.calc_launch_window(2024, 4, 1, 0.001, 10)
+    res, t_H = earth_mars.calc_launch_window(2024, 4, 1, 0.001, 10)
     print(res)

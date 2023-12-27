@@ -806,7 +806,7 @@ class PlanetsTransOrbit():
         t_H = np.pi * ((a_start + a_end)**3 / 8 / mu)**0.5
         n_end = (mu / a_end**3)**0.5
         delta_nu_rad = np.pi - n_end * t_H
-        return np.rad2deg(delta_nu_rad)
+        return np.rad2deg(delta_nu_rad), t_H
     
     def calc_launch_window(self, year_first, month_first, date_first, threshold, num):
         """
@@ -821,6 +821,8 @@ class PlanetsTransOrbit():
         output--------------------------
         sol : num*1 ndarray(double)
             num launch windows
+        t_H : double
+            time necessary for hohmann transition (s)
         """
         JS_start, _, _ = self.values.convert_times_to_T_TDB(year_first, month_first, date_first, 0, 0, 0)
         period = self.launch_window_period(JS_start)
@@ -830,7 +832,7 @@ class PlanetsTransOrbit():
         count = 0
 
         nu_start = self.calc_nu_between_planets(JS_start)
-        delta_nu = self.delta_nu(JS_start)
+        delta_nu, t_H = self.delta_nu(JS_start)
         nu_mid = self.calc_nu_between_planets(JS_mid)
         sign_delta_nu = delta_nu / np.abs(delta_nu)
 
@@ -858,7 +860,7 @@ class PlanetsTransOrbit():
         sol = np.zeros((num,6))
         for i in range(num):
             sol[i] =  np.array([self.values.convert_JD_to_times(JD_array[i])])
-        return sol
+        return sol, t_H
     
     def swingby(self,planet,theta_rad,r_h,v_B_vec,JS):
         """
@@ -943,7 +945,7 @@ class PlanetsTransOrbit():
         v_sat_end : 3*1 ndarray(double)
             velocity of a sat when reached target planet(sun centered)
         """
-        JS_start, _, _ = self.values.convert_times_to_T_TDB(self, *time_start)
+        JS_start, _, _ = self.values.convert_times_to_T_TDB(*time_start)
         JS_end = JS_start + duration
         r_start, v_planet_start = self.planet_start.position_JS(JS_start)
         r_end, v_planet_end = self.planet_end.position_JS(JS_end)
