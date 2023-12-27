@@ -1,0 +1,863 @@
+import numpy as np
+from matplotlib import pyplot as plt
+from matplotlib import cm
+
+class Values():
+    """
+    定数値など(ソースは大体wikipedia)
+    """
+    def __init__(self):
+        """
+        天文単位のみもっておく
+        """
+        #天文単位(km)
+        self.AU = 1.49597870 * 10**8
+    
+    def convert_times_to_T_TDB(self,year,month,date,hour,minute,second):
+        """
+        太陽系力学時をユリウス秒、日、世紀に変換
+        引数--------------------------
+        year : int
+            太陽系力学時
+        month : int
+            太陽系力学時
+        date : int
+            太陽系力学時
+        返り値--------------------------
+        JS : double
+            ユリウス日を秒単位に換算したもの
+        JD : double
+            ユリウス日
+        T_TDB : double
+            ユリウス世紀
+        """
+        JD  = 367 * year - int(7*(year + int((month + 9)/12))/4) + int(275 * month / 9) + date + 1721013.5 + ((second/60 + minute) / 60 + hour) / 24
+        JS = JD * 24 * 60 * 60
+        T_TDB = (JD - 2451545.0) / 36525.0
+        return JS, JD, T_TDB
+
+    def convert_JD_to_times(self,JD):
+        MJD = JD - 2400000.5
+        a = int(MJD) + 2400001
+        q = MJD - int(MJD)
+        b = int((a - 1867216.25)/36524.25)
+        c = a +b - int(b/4) + 1525
+        d = int((c-121.1)/365.25)
+        e = int(365.25*d)
+        f = int((c-e)/30.6001)
+        D = c - e - int(30.6001*f)
+        M = f - 1 - 12 * int(f/14)
+        Y = d - 4715 - int((7+M)/10)
+        h = int(24 * q)
+        m = 60 * (24*q - h)
+        s = 60 * (m - int(m))
+        return Y,M,D,h,m,s
+    
+    #長半径(km)
+    def a(self, planet_name,T_TDB):
+        a_dic = {
+            "Mercury":  0.387098310 * self.AU, 
+            "Venus"  :  0.723329820 * self.AU, 
+            "Earth"  :  1.000001018 * self.AU, 
+            "Mars"   :  1.523679342 * self.AU,
+            "Jupiter":  5.202603191 * self.AU + 0.0000001913 * T_TDB * self.AU,
+            "Saturn" :  9.554909596 * self.AU - 0.0000021389 * T_TDB * self.AU,
+            "Uranus" : 19.218446062 * self.AU - 0.0000000372 * T_TDB * self.AU + 0.00000000098 * T_TDB**2. * self.AU,
+            "Neptune": 30.110386869 * self.AU + 0.0000001913 * T_TDB * self.AU + 0.00000000069 * T_TDB**2. * self.AU,}
+        return a_dic[planet_name]
+    
+    #離心率
+    def e(self, planet_name, T_TDB):
+        e_dic = {
+            "Mercury": 0.20563175 + 0.000020406 * T_TDB - 0.0000000284 * T_TDB**2. - 0.00000000017 * T_TDB**3.,
+            "Venus"  : 0.00677188 - 0.000047766 * T_TDB + 0.0000000975 * T_TDB**2. + 0.00000000044 * T_TDB**3.,
+            "Earth"  : 0.01670862 - 0.000042037 * T_TDB - 0.0000001236 * T_TDB**2. + 0.00000000004 * T_TDB**3.,
+            "Mars"   : 0.09340062 + 0.000090483 * T_TDB - 0.0000000806 * T_TDB**2. - 0.00000000035 * T_TDB**3.,
+            "Jupiter": 0.04849485 + 0.000163244 * T_TDB - 0.0000004719 * T_TDB**2. - 0.00000000197 * T_TDB**3.,
+            "Saturn" : 0.05550962 - 0.000346818 * T_TDB - 0.0000006456 * T_TDB**2. + 0.00000000338 * T_TDB**3.,
+            "Uranus" : 0.04629590 - 0.000027337 * T_TDB + 0.0000000790 * T_TDB**2. + 0.00000000025 * T_TDB**3.,
+            "Neptune": 0.00898809 + 0.000006408 * T_TDB - 0.0000000008 * T_TDB**2.}
+        return e_dic[planet_name]
+    
+    #軌道傾斜角(deg)
+    def i(self, planet_name, T_TDB):
+        i_dic = {
+            "Mercury": 7.004986 - 0.0059516 * T_TDB + 0.00000081 * T_TDB**2. + 0.000000041 * T_TDB**3.,
+            "Venus"  : 3.394662 - 0.0008568 * T_TDB - 0.00003244 * T_TDB**2. + 0.000000010 * T_TDB**3.,
+            "Earth"  : 0.000000 + 0.0130546 * T_TDB - 0.00000931 * T_TDB**2. - 0.000000034 * T_TDB**3.,
+            "Mars"   : 1.849726 - 0.0081479 * T_TDB - 0.00002255 * T_TDB**2. - 0.000000027 * T_TDB**3.,
+            "Jupiter": 1.303270 - 0.0019872 * T_TDB + 0.00003318 * T_TDB**2. + 0.000000092 * T_TDB**3.,
+            "Saturn" : 2.488878 + 0.0025515 * T_TDB - 0.00004903 * T_TDB**2. + 0.000000018 * T_TDB**3., 
+            "Uranus" : 0.773196 - 0.0016869 * T_TDB + 0.00000349 * T_TDB**2. + 0.000000016 * T_TDB**3., 
+            "Neptune": 1.769952 + 0.0002257 * T_TDB + 0.00000023 * T_TDB**2. - 0.000000000 * T_TDB**3.,}
+        return i_dic[planet_name]
+    
+    #昇交点経度(deg)
+    def Omega(self, planet_name, T_TDB):
+        Omega_dic = {
+            "Mercury":  48.330893 - 0.1254229 * T_TDB - 0.00008833 * T_TDB**2. - 0.000000196 * T_TDB**3.,
+            "Venus"  :  76.679920 - 0.2780080 * T_TDB - 0.00014256 * T_TDB**2. - 0.000000198 * T_TDB**3.,
+            "Earth"  :   0.0,
+            "Mars"   :  49.558093 - 0.2949846 * T_TDB - 0.00063995 * T_TDB**2. - 0.000002143 * T_TDB**3.,
+            "Jupiter": 100.464441 + 0.1766828 * T_TDB + 0.00090387 * T_TDB**2. - 0.000007032 * T_TDB**3.,
+            "Saturn" : 113.665524 - 0.2566649 * T_TDB - 0.00018345 * T_TDB**2. + 0.000000357 * T_TDB**3., 
+            "Uranus" :  74.005947 + 0.0893206 * T_TDB - 0.00009470 * T_TDB**2. + 0.000000413 * T_TDB**3., 
+            "Neptune": 131.784057 - 0.0061651 * T_TDB - 0.00000219 * T_TDB**2. - 0.000000078 * T_TDB**3.}
+        return Omega_dic[planet_name]
+    
+    #近地点引数(deg)
+    def omega(self, planet_name,T_TDB):
+        omega_dic = {
+            "Mercury":  77.456119 + 0.1588643 * T_TDB - 0.00001343 * T_TDB**2. + 0.000000039 * T_TDB**3.- self.Omega("Mercury", T_TDB),
+            "Venus"  : 131.563707 + 0.0048646 * T_TDB - 0.00138232 * T_TDB**2. - 0.000005332 * T_TDB**3.- self.Omega("Venus", T_TDB),
+            "Earth"  : 102.937348 + 0.3225557 * T_TDB + 0.00015026 * T_TDB**2. + 0.000000478 * T_TDB**3.- self.Omega("Earth", T_TDB),
+            "Mars"   : 336.060234 + 0.4438898 * T_TDB - 0.00017321 * T_TDB**2. + 0.000000300 * T_TDB**3.- self.Omega("Mars", T_TDB),
+            "Jupiter":  14.331309 + 0.2155525 * T_TDB + 0.00072252 * T_TDB**2. - 0.000004590 * T_TDB**3.- self.Omega("Jupiter", T_TDB),
+            "Saturn" :  93.056787 + 0.5665496 * T_TDB + 0.00052809 * T_TDB**2. + 0.000004882 * T_TDB**3.- self.Omega("Saturn", T_TDB),
+            "Uranus" : 173.005159 + 0.0893206 * T_TDB - 0.00009470 * T_TDB**2. + 0.000000413 * T_TDB**3.- self.Omega("Uranus", T_TDB),
+            "Neptune": 131.784057 + 0.0291587 * T_TDB + 0.00007051 * T_TDB**2. - 0.000000000 * T_TDB**3.- self.Omega("Neptune", T_TDB)}
+        return omega_dic[planet_name]
+    
+    #平均経度(deg)
+    def lambdaM(self, planet_name, T_TDB):
+        lambdaM_dic = {
+            "Mercury": 252.250906 + 149472.6746358 * T_TDB - 0.00000535 * T_TDB**2. + 0.000000002 * T_TDB**3.,
+            "Venus"  : 181.979801 +  58517.8156760 * T_TDB + 0.00000165 * T_TDB**2. - 0.000000002 * T_TDB**3.,
+            "Earth"  : 100.466449 +  35999.3728519 * T_TDB - 0.00000568 * T_TDB**2. + 0.000000000 * T_TDB**3.,
+            "Mars"   : 355.433275 +  19140.2993313 * T_TDB + 0.00000261 * T_TDB**2. - 0.000000003 * T_TDB**3.,
+            "Jupiter":  34.351484 +   3034.9056746 * T_TDB - 0.00008501 * T_TDB**2. + 0.000000004 * T_TDB**3.,
+            "Saturn" :  50.077471 +   1222.1137943 * T_TDB + 0.00021004 * T_TDB**2. - 0.000000019 * T_TDB**3.,
+            "Uranus" : 314.055005 +    428.4669983 * T_TDB - 0.00000486 * T_TDB**2. + 0.000000006 * T_TDB**3., 
+            "Neptune": 304.348665 +    218.4862002 * T_TDB + 0.00000059 * T_TDB**2. - 0.000000002 * T_TDB**3.}
+        return lambdaM_dic[planet_name]
+    
+    #重力定数(km^3/s^2) 
+    def mu(self,planet_name):
+        mu_dic = {
+        "Sun"    : 1.32712440 * 10**11,
+        "Mercury": 2.203208 * 10**4,
+        "Venus"  : 3.248587 * 10**5,
+        "Earth"  : 3.986004 * 10**5,
+        "Mars"   : 4.282829 * 10**4,
+        "Jupiter": 1.267126 * 10**8,
+        "Saturn" : 3.793952 * 10**7, 
+        "Uranus" : 5.780159 * 10**6, 
+        "Neptune": 6.871308 * 10**6}
+        return mu_dic[planet_name]
+    
+    #半径(km)
+    def radius(self, planet_name):
+        radius_dic = {
+        "Sun"    : 6.96 * 10**5,
+        "Mercury": 2.4394 * 10**3,
+        "Venus"  : 6.0518 * 10**3,
+        "Earth"  : 6.378137 * 10**3,
+        "Mars"   : 3.39619 * 10**3,
+        "Jupiter": 7.1492 * 10**4,
+        "Saturn" : 6.0268 * 10**4, 
+        "Uranus" : 2.5559 * 10**4, 
+        "Neptune": 2.4764 * 10**4}
+        return radius_dic[planet_name]
+
+    #赤道の自転周期(s)
+    def rotation_period(self, planet_name):
+        rotation_period_dic = {
+        "Sun"    : 25.379995 * 60**2 * 24,
+        "Mercury": 58.6462 * 60**2 * 24,
+        "Venus"  : -243.0187 * 60**2 * 24,
+        "Earth"  : 0.99726968 * 60**2 * 24,
+        "Mars"   : 1.02595675 * 60**2 * 24,
+        "Jupiter": 0.41007 * 60**2 * 24,
+        "Saturn" : 0.426 * 60**2 * 24,
+        "Uranus" : -0.71833 * 60**2 * 24,
+        "Neptune": 0.67125 * 60**2 * 24}
+        return rotation_period_dic[planet_name]
+    
+class TrajectoryCalculator(): 
+    """
+    軌道を求めるための計算機。中心天体ごとにインスタンスを作ること。
+    Attributes
+    ----------
+    values : class
+       定数値の保持
+    threshold : double
+       ニュートンラフソン法の閾値
+    mu : double
+        重力定数(m^3/s^2)
+    """
+
+    def __init__(self, center_planet_name, threshold = 0.01, values = Values()):
+        self.values = values
+        self.threshold = threshold
+        self.mu = self.values.mu(center_planet_name)
+
+    def solve_Kepler(self,a,e,t_p,t,E0):
+        """
+        ニュートンラフソン法でケプラー方程式を解く
+        引数--------------------------
+        a : double
+            長半径(km)
+        e : double
+            離心率
+        t_p : double
+            近地点通過時刻(s)
+        mu : double
+            重力定数（惑星か太陽かに注意）
+        t : double
+            r,vを求めたい時刻(s)
+        E0 : double
+            ニュートンラフソン法の初期値(deg)
+        返り値--------------------------
+         E : double
+            時刻tのEの値(deg)
+        """
+        E_pre_rad = np.radians(E0)
+        E_rad = E_pre_rad - (E_pre_rad - e * np.sin(E_pre_rad) - (self.mu / a**3)**0.5 *(t - t_p)) / (1 - e * np.cos(E_pre_rad))
+        while(np.abs(E_pre_rad - E_rad) >= self.threshold):
+            E_pre_rad = E_rad
+            E_rad = E_pre_rad - (E_pre_rad - e * np.sin(E_pre_rad) - (self.mu / a**3)**0.5 *(t - t_p)) / (1 - e * np.cos(E_pre_rad))
+        return np.degrees(E_rad)
+    
+    def solve_hyperbola_eq(self,a,e,t_p,t,H0):
+        """
+        ニュートンラフソン法で双曲線の方程式を解く
+        引数--------------------------
+        a : double
+            長半径(km)
+        e : double
+            離心率
+        t_p : double
+            近地点通過時刻(s)
+        t : double
+            時刻(s)
+        H0 : double
+            ニュートンラフソン法の初期値(deg)
+        返り値--------------------------
+         H : double
+            時刻tのHの値(deg)
+        """
+        H_pre_rad = np.radians(H0)
+        H_rad = H_pre_rad - (e * np.sinh(H_pre_rad) - H_pre_rad - (self.mu / -a**3)**0.5 *(t - t_p)) / (e * np.cosh(H_pre_rad) - 1)
+        while(np.abs(H_pre_rad - H_pre_rad) >= self.threshold):
+            H_pre_rad = H_pre_rad
+            H_pre_rad = H_pre_rad - (e * np.sinh(H_pre_rad) - H_pre_rad - (self.mu / -a**3)**0.5 *(t - t_p)) / (e * np.cosh(H_pre_rad) - 1)
+        return np.degrees(H_rad)
+    
+    def calc_PQW_from_orbital_elems(self,a,e,i,omega,Omega,t_p):
+        """
+        軌道要素からPQRベクトルを求める
+        引数--------------------------
+        a : double
+            長半径(km)
+        i : double
+            軌道傾斜角(deg)
+        e : double
+            離心率
+        omega : double
+            近地点引数(deg)
+        Omega : double
+            昇交点離角(deg)
+        t_p : double
+            近地点通過時刻(s)
+        返り値--------------------------
+        P_hat_vec : ndarraty
+            基準ベクトル
+        Q_hat_vec : ndarraty
+            基準ベクトル
+        W_hat_vec : ndarraty
+            基準ベクトル
+        """
+        omega_rad = np.radians(omega)
+        Omega_rad = np.radians(Omega)
+        i_rad = np.radians(i)
+        #軌道面内単位ベクトル（近地点方向）
+        P_hat_vec = np.array(
+            [[np.cos(omega_rad) * np.cos(Omega_rad) - np.sin(omega_rad) * np.sin(Omega_rad) * np.cos(i_rad)],
+             [np.cos(omega_rad) * np.sin(Omega_rad) + np.sin(omega_rad) * np.cos(Omega_rad) * np.cos(i_rad)],
+             [np.sin(omega_rad) * np.sin(i_rad)]])
+        #軌道面内単位ベクトル（近地点垂直方向）
+        Q_hat_vec = np.array(
+            [[-np.sin(omega_rad) * np.cos(Omega_rad) - np.cos(omega_rad) * np.sin(Omega_rad) * np.cos(i_rad)],
+             [-np.sin(omega_rad) * np.sin(Omega_rad) + np.cos(omega_rad) * np.cos(Omega_rad) * np.cos(i_rad)],
+             [np.cos(omega_rad) * np.sin(i_rad)]])     
+        #軌道面垂直方向単位ベクトル
+        W_hat_vec = np.array(
+            [[np.sin(Omega_rad) * np.sin(i_rad)],
+             [-np.cos(Omega_rad) * np.sin(i_rad)],
+             [np.cos(i_rad)]])
+        
+        return P_hat_vec, Q_hat_vec, W_hat_vec
+    
+    def calc_r_v_from_orbital_elems(self,a,e,i,omega,Omega,t_p,t):
+        """
+        軌道要素からある時刻のr,vを求める
+        引数--------------------------
+        a : double
+            長半径(km)
+        i : double
+            軌道傾斜角(deg)
+        e : double
+            離心率
+        omega : double
+            近地点引数(deg)
+        Omega : double
+            昇交点離角(deg)
+        t_p : double
+            近地点通過時刻(s)
+        t : double
+            r,vを求めたい時刻(s)
+        返り値--------------------------
+        r_vec : 3*1 ndarray(double)
+            時刻tのrの値(km)
+        v_vec : 3*1 ndarray(double)
+            時刻tのvの値(km/s)
+        """
+        omega_rad = np.radians(omega)
+        Omega_rad = np.radians(Omega)
+        i_rad = np.radians(i)
+        #軌道面内単位ベクトル（近地点方向）
+        P_hat_vec, Q_hat_vec, _ =  self.calc_PQW_from_orbital_elems(a,e,i,omega,Omega,t_p)
+        p = a * (1 - e**2)
+        #楕円の場合
+        if (a > 0):
+            E = self.solve_Kepler(a,e,t_p,t,100)
+            E_rad = np.radians(E)
+            r = a * (1 - e * np.cos(E_rad))
+            r_vec = a * (np.cos(E_rad) - e) * P_hat_vec + (a * p)**0.5 * np.sin(E_rad) * Q_hat_vec
+            v_vec = -(a * self.mu)**0.5 / r * np.sin(E_rad) * P_hat_vec + (self.mu * p)**0.5 / r * np.cos(E_rad) * Q_hat_vec
+        #双曲線の場合（放物線は考えない）
+        else:
+            H = self.solve_hyperbola_eq(a,e,t_p,t,100)
+            H_rad = np.radians(H)
+            r = a * (1 - e * np.cosh(H_rad))
+            r_vec = a * (np.cosh(H_rad) - e) * P_hat_vec + (- a * p)**0.5 * np.sinh(H_rad) * Q_hat_vec
+            v_vec = -(-a * self.mu)**0.5 / r * np.sinh(H_rad) * P_hat_vec + (self.mu * p)**0.5 / r * np.cosh(H_rad) * Q_hat_vec
+        return r_vec, v_vec
+    
+    def calc_orbital_elems_from_r_v(self, r_vec ,v_vec, t,
+                                i_hat_vec = np.array([[1],[0],[0]]), j_hat_vec= np.array([[0],[1],[0]]), k_hat_vec= np.array([[0],[0],[1]])):
+        """
+        ある時刻のr,vから軌道要素を求める
+        引数--------------------------
+        r_vec : 3*1 ndarray(double)
+            rの値(km)
+        v_vec : 3*1 ndarray(double)
+            vの値(km/s)
+        t : double
+            時刻(s)
+        i_hat_vec : 3*1 ndarray(double)
+            赤道面の春分点方向基準ベクトル
+        j_hat_vec : 3*1 ndarray(double)
+            赤道面の春分点垂直方向基準ベクトル
+        k_hat_vec : 3*1 ndarray(double)
+            赤道面に垂直な基準ベクトル
+        返り値--------------------------
+        a : double
+            長半径(km)
+        i : double
+            軌道傾斜角(deg)
+        e : double
+            離心率
+        omega : double
+            近地点引数(deg)
+        Omega : double
+            昇交点離角(deg)
+        t_p : double
+            近地点通過時刻(s)
+        P_hat_vec : ndarraty
+            基準ベクトル
+        W_hat_vec : ndarraty
+            基準ベクトル
+        Q_hat_vec : ndarraty
+            基準ベクトル
+        """
+        r = np.linalg.norm(r_vec)
+        epsilon = 0.5 * np.dot(v_vec.T,v_vec) - self.mu / r #エネルギー積分
+        h_vec = np.cross(r_vec.T, v_vec.T).T #角運動量
+        P_vec = np.cross(v_vec.T, h_vec.T).T - self.mu * r_vec / r #ラプラスベクトル
+        P_hat_vec = P_vec / np.linalg.norm(P_vec) #基準ベクトル
+        W_hat_vec = h_vec / np.linalg.norm(h_vec) #基準ベクトル
+        Q_hat_vec = np.cross(W_hat_vec.T, P_hat_vec.T).T #基準ベクトル
+
+        a = - self.mu / 2.0 / epsilon
+        e = np.linalg.norm(P_vec) / self.mu
+        i = np.degrees(np.arccos(np.dot(W_hat_vec.T,k_hat_vec)))
+        Omega = np.degrees(np.arctan2( np.dot(W_hat_vec.T, i_hat_vec), - np.dot(W_hat_vec.T, j_hat_vec)))
+        N_hat_vec = np.cross(k_hat_vec.T, h_vec.T).T / np.linalg.norm(np.cross(k_hat_vec.T, h_vec.T))  #昇交点方向基準ベクトル
+        omega = np.degrees(np.arccos(np.dot(N_hat_vec.T, P_hat_vec)))
+        if (np.dot(P_hat_vec.T, k_hat_vec) < 0):
+            omega = 360 - omega
+        if (a > 0): #楕円の場合
+            E_rad  = np.arctan2(np.dot(r_vec.T, v_vec) / (self.mu * a)**0.5, (1 - r / a))
+            t_p = t - (a**3 / self.mu)**0.5 * (E_rad - e * np.sin(E_rad))
+        else: #双曲線の場合
+            H_rad  = np.arcsinh(np.dot(r_vec.T, v_vec) / (self.mu * -a)**0.5 / e)
+            t_p = t - (-a**3 / self.mu)**0.5 * (e * np.sin(H_rad) - H_rad)
+        return float(a),float(e),float(i),float(omega),float(Omega),float(t_p),P_hat_vec, Q_hat_vec,W_hat_vec
+
+    def eci2ecef(self, r, theta):
+        """
+        春分方向をx方向とする座標系から惑星固定座標系に
+        引数--------------------------
+        r : 3*1 ndarray(double)
+            ECI座標系での座標
+        theta : double
+            グリニッジ恒星時(deg)
+        返り値--------------------------
+        r_ecef : 3*1 ndarray(double)
+            ECEF座標系での座標
+        """
+        theta_rad = np.radians(theta)
+        R = np.array([[np.cos(-theta_rad), -np.sin(-theta_rad), 0],[np.sin(-theta_rad), np.cos(-theta_rad), 0], [0, 0, 1]])
+        r_ecef = np.dot(R, r)
+        return r_ecef
+
+    def calc_geodetic_position(self, r_ecef):
+        """
+        緯度・経度を求める
+        引数--------------------------
+        r_ecef : 3*1 ndarray(double)
+            ECEF座標系での座標
+        返り値--------------------------
+        longitude : double
+            経度
+        latitude : double
+            緯度
+        """
+        longitude_rad = np.arctan2(r_ecef[1], r_ecef[0])
+        longitude = np.degrees(longitude_rad)
+
+        r = np.sqrt(r_ecef[0]**2 + r_ecef[1]**2)
+        latitude_rad = np.arctan2(r_ecef[2], r)
+        latitude = np.degrees(latitude_rad)
+
+        return longitude, latitude
+    
+class Planet():
+    """
+    惑星クラス、太陽周回軌道面や位置などの情報を与える
+    """
+    def __init__(self, planet_name, values = Values(), calculator  = TrajectoryCalculator):
+        self.values = values
+        self.planet_name = planet_name
+        self.mu_sun = values.mu("Sun")
+        self.calculator = calculator("Sun")
+        self.mu = values.mu(planet_name)
+        self.radius = values.radius(planet_name)
+        self.rotation_period = values.rotation_period(planet_name)
+        self.rotation_omega = 360 / self.rotation_period
+
+    def position(self, year, month, date, hour, minute, second):
+        """ある時刻の惑星のr,vを求める
+        引数--------------------------
+            時刻（太陽系力学時）
+        返り値--------------------------
+        r_vec : 3*1 ndarray(double)
+            時刻tのrの値(km)
+        v_vec : 3*1 ndarray(double)
+            時刻tのvの値(km/s)
+        """
+        JS,JD,T_TDB = self.values.convert_times_to_T_TDB(year, month, date, hour, minute, second)
+        a = self.values.a(self.planet_name, T_TDB) #長半径(km)
+        e = self.values.e(self.planet_name, T_TDB) #離心率
+        i = self.values.i(self.planet_name, T_TDB) #軌道面傾斜角(deg)
+        Omega = self.values.Omega(self.planet_name, T_TDB) #昇交点経度(deg)
+        omega = self.values.omega(self.planet_name, T_TDB) #近地点引数(deg)
+        lambdaM = self.values.lambdaM(self.planet_name, T_TDB) #平均経度(deg)
+        omega_tilde = omega + Omega
+        M = lambdaM - omega_tilde
+        M_rad = np.radians(M)
+        t_p = JS - M_rad * (a**3/self.mu_sun)**0.5
+        return self.calculator.calc_r_v_from_orbital_elems(a,e,i,omega,Omega,t_p,JS)
+    
+    def position_JS(self, JS):
+        """ある時刻の惑星のr,vを求める
+        引数--------------------------
+            時刻（JD*24*60*60)
+        返り値--------------------------
+        r_vec : 3*1 ndarray(double)
+            時刻tのrの値(km)
+        v_vec : 3*1 ndarray(double)
+            時刻tのvの値(km/s)
+        """
+        JD = JS / 24 / 60 / 60
+        T_TDB = (JD - 2451545.0) / 36525.0
+        a = self.values.a(self.planet_name, T_TDB) #長半径(km)
+        e = self.values.e(self.planet_name, T_TDB) #離心率
+        i = self.values.i(self.planet_name, T_TDB) #軌道面傾斜角(deg)
+        Omega = self.values.Omega(self.planet_name, T_TDB) #昇交点経度(deg)
+        omega = self.values.omega(self.planet_name, T_TDB) #近地点引数(deg)
+        lambdaM = self.values.lambdaM(self.planet_name, T_TDB) #平均経度(deg)
+        omega_tilde = omega + Omega
+        M = lambdaM - omega_tilde
+        M_rad = np.radians(M)
+        t_p = JS - M_rad * (a**3/self.mu_sun)**0.5
+        return self.calculator.calc_r_v_from_orbital_elems(a,e,i,omega,Omega,t_p,JS)
+    
+    def plot_trajectory(self,start_date=(2023,3,3,0,0,0),end_date=(2060,3,3,0,0,0)):
+        start_JS = self.values.convert_times_to_T_TDB(*start_date)[0]
+        end_JS = self.values.convert_times_to_T_TDB(*end_date)[0]
+        x = np.array([])
+        y = np.array([])
+        for i in range(int(start_JS/100000),int(end_JS/100000)):
+            r = self.position_JS(i*100000)[0]
+            x = np.append(x,r[0])
+            y = np.append(y,r[1])
+        plt.plot(x,y,"k")
+
+class LambertSolver():
+    """
+    ランベルト問題を解くための関数群を保持。軌道計算ごとにインスタンスを定義すること
+    """
+    def __init__(self,r1_vec,r2_vec,t1,t2,k_hat_vec = np.array([[0.],[0.],[1.]]),values = Values()):
+        """
+        引数--------------------------
+        r1_vec : 3*1 ndarray
+            出発位置(km)
+        r2_vec : 3*1 ndarray
+            到着位置(km)
+        t1 : double
+            出発時刻(s)
+        t2 : double
+            到着時刻
+        """
+        self.mu = values.mu("Sun")
+        self.r1_vec = r1_vec
+        self.r2_vec = r2_vec
+        self.r1 = np.linalg.norm(r1_vec)
+        self.r2 = np.linalg.norm(r2_vec)
+        self.t1 = t1
+        self.t2 = t2
+        self.k_hat_vec = k_hat_vec
+        self.delta_t = t2 - t1 #飛行時間
+        self.c = np.linalg.norm(r2_vec - r1_vec) #2点間距離
+        self.s = (self.r1 + self.r2 + self.c) / 2. 
+        self.a_m = self.s / 2. #楕円軌道での最小長半径。FとF*が同じ側か判断
+
+    def set_flag_delta_nu_is_under_180(self):
+        """
+        遷移角が180度以上か判断し、nu_is_under_180をセット
+        """
+        #delta_nuを求める
+        cos_delta_nu = np.dot(self.r1_vec.T, self.r2_vec) / self.r1 / self.r2
+        sin_delta_nu = (1 - cos_delta_nu**2.)**0.5
+        if (np.dot(np.cross(self.r1_vec.T,self.r2_vec.T), self.k_hat_vec) < 0): #r1からr2への向きが右回りなら符号を逆転
+            sin_delta_nu = - sin_delta_nu
+        self.delta_nu_rad = np.arctan2(sin_delta_nu, cos_delta_nu) #-180~180
+        if (self.delta_nu_rad < 0): #0~360の範囲に
+            self.delta_nu_rad = self.delta_nu_rad + np.pi * 2.
+        self.delta_nu_is_under_180 = (0 <= self.delta_nu_rad <= np.pi)
+    
+    def set_flag_is_ellipse(self, delta_nu_is_under_180):
+        """
+        軌道を判断（放物線は考えない）し、is_ellipseをセット
+        """
+        if (delta_nu_is_under_180):
+            delta_t_p = 1. / 3. * (2. / self.mu)**0.5 * (self.s**1.5 - (self.s - self.c)**1.5) #放物線軌道の遷移時間
+            self.is_ellipse = self.delta_t > delta_t_p
+        else:
+            delta_t_p = 1. / 3. * (2. / self.mu)**0.5 * (self.s**1.5 + (self.s - self.c)**1.5) #放物線軌道の遷移時間
+            self.is_ellipse = self.delta_t > delta_t_p
+    
+    def set_flag_focus_is_same_side(self, delta_nu_is_under_180):
+        """
+        楕円軌道で焦点が同じ側にあるか判断し、focus_is_same_sideをセット
+        """
+        #delta_tを求める
+        beta_m_rad = 2 * np.arcsin(((self.s - self.c) / self.s)**0.5)
+        if (delta_nu_is_under_180):
+            delta_t_m = (self.a_m**3. / self.mu)**0.5 * (np.pi - (beta_m_rad - np.sin(beta_m_rad))) #最小楕円軌道の遷移時間
+            self.focus_is_same_side = self.delta_t < delta_t_m #双曲線では不要
+        else:
+            delta_t_m = (self.a_m**3. / self.mu)**0.5 * (np.pi + (beta_m_rad - np.sin(beta_m_rad))) #最小楕円軌道の遷移時間
+            self.focus_is_same_side = self.delta_t > delta_t_m #双曲線では不要
+    
+    def calc_delta_t(self, a):
+        """
+        長半径に対して飛行時間を返す関数
+        引数--------------------------
+        a : double
+            長半径(km)
+        返り値--------------------------
+        delta_t : double
+            飛行時間
+        """
+        #楕円の場合
+        if (self.is_ellipse): 
+            alpha_rad = 2. * np.arcsin((self.s / 2. / a)**0.5)
+            beta_rad = 2. * np.arcsin(((self.s - self.c)/ 2. / a)**0.5)
+            if (self.delta_nu_is_under_180):
+                if (self.focus_is_same_side):
+                    return (a**3. / self.mu)**0.5 * ((alpha_rad - np.sin(alpha_rad)) - (beta_rad - np.sin(beta_rad)))
+                else:
+                    return (a**3. / self.mu)**0.5 * (2 * np.pi - (alpha_rad - np.sin(alpha_rad)) - (beta_rad - np.sin(beta_rad)))
+            else:
+                if (self.focus_is_same_side):
+                    return (a**3. / self.mu)**0.5 * (2 * np.pi - (alpha_rad - np.sin(alpha_rad)) + (beta_rad - np.sin(beta_rad)))
+                else:
+                    return (a**3. / self.mu)**0.5 * ((alpha_rad - np.sin(alpha_rad)) + (beta_rad - np.sin(beta_rad)))
+        else: 
+            gamma_rad = 2. * np.arcsinh((self.s / 2 / a)**0.5)
+            delta_rad = 2. * np.arcsinh(((self.s - self.c)/ 2 / a)**0.5)
+            if (self.delta_nu_is_under_180):
+                return (a**3. / self.mu)**0.5 * ((np.sinh(gamma_rad) - gamma_rad) - (np.sinh(delta_rad) - delta_rad))
+            else:
+                return (a**3. / self.mu)**0.5 * ((np.sinh(gamma_rad) - gamma_rad) + (np.sinh(delta_rad) - delta_rad))
+            
+    def calc_d_da_delta_t(self, a):
+        """
+        飛行時間の長半径微分を返す関数
+        引数--------------------------
+        a : double
+            長半径(km)
+        返り値--------------------------
+        d_da_delta_t : double
+            飛行時間の長半径微分
+        """
+        T = 2. * np.pi * (a**3. / self.mu)**0.5
+        if (self.is_ellipse):
+            alpha_rad = 2. * np.arcsin((self.s / 2. / a)**0.5)
+            beta_rad = 2. * np.arcsin(((self.s - self.c)/ 2. / a)**0.5)
+            if (self.delta_nu_is_under_180):
+                if (self.focus_is_same_side):
+                    return 3. * self.delta_t / 2. / a - 1 / (self.mu * a**3)**0.5 * (self.s**2 / np.sin(alpha_rad) - (self.c - self.s)**2. / np.sin(beta_rad))
+                else:
+                    return 3. * T / 2. / a + 3. * self.delta_t / 2. / a + 1 / (self.mu * a**3)**0.5 * (self.s**2 / np.sin(alpha_rad) + (self.c - self.s)**2. / np.sin(beta_rad))
+            else:
+                if (self.focus_is_same_side):
+                    return 3. * T / 2. / a + 3. * self.delta_t / 2. / a + 1 / (self.mu * a**3)**0.5 * (self.s**2 / np.sin(alpha_rad) - (self.c - self.s)**2. / np.sin(beta_rad))
+                else:
+                    return 3. * self.delta_t / 2. / a - 1 / (self.mu * a**3)**0.5 * (self.s**2 / np.sin(alpha_rad) + (self.c - self.s)**2. / np.sin(beta_rad))
+                   
+        else:
+            gamma_rad = 2 * np.arcsinh((self.s / 2 / a)**0.5)
+            delta_rad = 2 * np.arcsinh(((self.s - self.c)/ 2 / a)**0.5)
+            if (self.delta_nu_is_under_180):
+                return 3. * self.delta_t / 2. / a - 1 / (self.mu * a**3)**0.5 * (self.s**2 / np.sinh(gamma_rad) - (self.c - self.s)**2. / np.sinh(delta_rad))
+            else:
+                return 3. * self.delta_t / 2. / a - 1 / (self.mu * a**3)**0.5 * (self.s**2 / np.sinh(gamma_rad) + (self.c - self.s)**2. / np.sinh(delta_rad))
+                                                                                                                                                
+    def calc_a(self):
+        """
+        ニュートンラフソン法によって飛行時間を満たす長軸半径を求める
+        返り値--------------------------
+        a : double
+            長半径(km)
+        """
+        a = 1.1 * self.a_m
+        n = 0
+        while(np.abs(self.calc_delta_t(a) - self.delta_t) > self.delta_t * 10**(-10)):
+            rho = 1.
+            while(a + rho*(self.delta_t - self.calc_delta_t(a)) / self.calc_d_da_delta_t(a) < self.a_m): #a_m以下にはならないことからステップをつける（あるみほ条件）
+                rho = 0.9*rho
+            a = a + rho * (self.delta_t - self.calc_delta_t(a)) / self.calc_d_da_delta_t(a)
+            n = n + 1
+            if(n>1000):
+                print("can't calculate",self.t1,self.t2)
+                break
+        if (not self.is_ellipse):
+            a = -a
+        return a
+
+    def solve_lambert(self):
+        """
+        ランベルト問題を解く関数
+        """
+        #形状などを判断
+        self.set_flag_delta_nu_is_under_180()
+        self.set_flag_is_ellipse(self.delta_nu_is_under_180)
+        self.set_flag_focus_is_same_side(self.delta_nu_is_under_180)
+        #Δtを満たす長半径を求める
+        a = self.calc_a()
+        
+        #以下は後処理
+        #pを求める
+        if (self.is_ellipse):
+            alpha_rad = 2. * np.arcsin((self.s / 2. / a)**0.5)
+            beta_rad = 2. * np.arcsin(((self.s - self.c)/ 2. / a)**0.5)
+            if(self.focus_is_same_side):
+                p = 4 * a * (self.s - self.r1) * (self.s - self.r2) / self.c**2 * np.sin(alpha_rad / 2 + beta_rad / 2)**2
+            else:
+                p = 4 * a * (self.s - self.r1) * (self.s - self.r2) / self.c**2 * np.sin(alpha_rad / 2 - beta_rad / 2)**2
+        else:
+            gamma_rad = 2 * np.arcsinh((self.s / 2 / -a)**0.5)
+            delta_rad = 2 * np.arcsinh(((self.s - self.c)/ 2 / -a)**0.5)
+            if(self.delta_nu_is_under_180):
+                p = -4 * a * (self.s - self.r1) * (self.s - self.r2) / self.c**2 * np.sinh(gamma_rad / 2 + delta_rad / 2)**2
+            else:
+                p = -4 * a * (self.s - self.r1) * (self.s - self.r2) / self.c**2 * np.sinh(gamma_rad / 2 - delta_rad / 2)**2
+        #離心率
+        e = (1 - p / a)**0.5
+        #ν1,2を求める
+        cos_nu_1 = (p - self.r1) / 2 / self.r1
+        sin_nu_1 = 1 / np.sin(self.delta_nu_rad) * (cos_nu_1 * np.cos(self.delta_nu_rad) - (p - self.r2) / 2 / self.r2) #加法定理（arctanでnu_1を求めたい）
+        nu_1_rad = np.arctan2(sin_nu_1,cos_nu_1)
+        nu_2_rad = (nu_1_rad + self.delta_nu_rad)
+        #v1,v2を求める
+        g = self.r1 * self.r2 * np.sin(self.delta_nu_rad) / (self.mu * p)**0.5
+        f = 1 - self.r2 / p * (1 - np.cos(self.delta_nu_rad))
+        g_dot = 1 - self.r1 / p * (1 - np.cos(self.delta_nu_rad))
+        v1_vec = 1 / g * (self.r2_vec - f * self.r1_vec)
+        v2_vec = 1 / g * (g_dot * self.r2_vec - self.r1_vec)
+        return a, e, p, float(nu_1_rad), float(nu_2_rad),v1_vec,v2_vec
+
+class Satellite():
+    def __init__(self, planet, calculator = TrajectoryCalculator):
+        self.planet = planet
+        self.calculator = calculator(planet.planet_name)
+
+    def init_orbit_by_orbital_elems(self, a, e, i, omega, Omega, t_p):
+        self.orbital_elems = np.array([a, e, i, omega, Omega, t_p])
+
+    def init_orbit_by_rv(self, r_vec ,v_vec, t0):
+        self.orbital_elems = np.array([self.calculator.calc_orbital_elems_from_r_v(self, r_vec ,v_vec, t0)])
+
+    def get_rv(self, t):
+        r, v = self.calculator.calc_r_v_from_orbital_elems(*self.orbital_elems, t)
+        return r, v
+
+class Occultation():
+    """
+    衛星間電波遮蔽計算用のクラス
+    """
+    def __init__(self, planet, satellites, calculator  = TrajectoryCalculator):
+        """ある時刻の惑星のr,vを求める
+        引数--------------------------
+            planet : Planet
+                中心惑星
+        """
+        self.planet = planet
+        self.sats = satellites
+        self.trajectory_calculator = calculator(planet.planet_name)
+        
+    
+    def get_position_observed(self, r1, r2):
+        """観測点を求める
+        引数--------------------------
+            r1,r2 : 3*1 ndarray(double)
+                2衛星のどちらかの位置ベクトル
+        返り値--------------------------
+        distance : double
+            中心惑星と直線の距離
+        r_h : 3*1 ndarray(double)
+            垂線の脚の座標
+        is_occultated : bool
+            遮蔽されているか
+        """
+        r_rel = r2 - r1
+        r_h = r1 - (np.dot(r1.T, r_rel) / np.linalg.norm(r_rel)**2 * r_rel)
+        distance = np.linalg.norm(r_h)
+        
+        if (distance < self.planet.radius and np.dot((r1 - r_h).T,r2 - r_h) < 0):
+            is_occultated = True
+        else:
+            is_occultated = False
+
+        return distance, r_h, is_occultated
+
+    def geodetic_position_observed(self, r_h, theta):
+        """垂線の足の座標から電波遮蔽の観測点の緯度・経度を求める
+        引数--------------------------
+        r_h : 3*1 ndarray(double)
+            垂線の脚の座標
+        theta : double
+            グリニッジ恒星時(deg)
+        返り値--------------------------
+        longitude : double
+            観測点の経度
+        latitude : double
+            観測点の緯度
+        """
+        r_observed = r_h * self.planet.radius / np.linalg.norm(r_h)
+        r_ecef = self.trajectory_calculator.eci2ecef(r_observed, theta)
+        longitude, latitude = self.trajectory_calculator.calc_geodetic_position(r_ecef)
+        return longitude, latitude
+
+    def get_position_observed_mult(self, sats, t):
+        """観測点を求める
+        引数--------------------------
+        sats : list(Satellite)
+            衛星たち
+        t : double
+            時刻
+        返り値--------------------------
+        r_h_list : n*n*3 ndarray(double)
+            垂線の脚の座標のリスト
+        is_occultated_list : n*n list(bool)
+            遮蔽されているかのリスト
+        """
+        n = len(sats)
+        is_occultated_list = np.full((n,n),False)
+        r_h_list = np.zeros((n,n,3))
+        for i in range(n):
+            for j in range(n):
+                if (i == j):
+                    break
+                ri, _ = sats[i].get_rv(t)
+                rj, _ = sats[j].get_rv(t)
+                _, r_h, is_occultated = self.get_position_observed(ri, rj)
+                r_h_list[i][j] = r_h.T
+                is_occultated_list[i][j] = is_occultated
+        return r_h_list, is_occultated_list
+
+    def simulate_position_observed(self, theta0, t0, t_end, dt):
+        """シミュレーションにより観測点を求める
+        引数--------------------------
+        theta0 :double
+            t0でのグリニッジ恒星時(deg)
+        t0 : double
+            初期時刻
+        t_end : double
+            シミュレーション終了時刻
+        dt : double
+            シミュレーションステップ幅
+        返り値--------------------------
+        latitude_list : ndarray(double)
+            観測点のlatitude
+        longitude_list : ndarray(double)
+            観測点のlongitude
+        """
+        n_step = int((t_end - t0) / dt)
+        n = len(self.sats)
+
+        is_occultated_list = np.full((n,n),False)
+        prev_is_occultated_list = np.full((n,n),False)
+        is_first_list =  np.full((n,n),True)
+        mask_tri = np.tril(np.full((n,n),True), k = -1) # 上半分と下半分でsat1→sat2とsat2→sat1が重複するため、片方だけ取ってくる
+        r_h_list = np.zeros((n,n,3))
+        latitude_list = np.array([])
+        longitude_list = np.array([])
+        count = 0
+
+        t = t0
+        theta = theta0
+        for i in range(n_step):
+            r_h_list, is_occultated_list = self.get_position_observed_mult(self.sats, t)
+
+            # 掩蔽開始時
+            mask1 = is_occultated_list & is_first_list & mask_tri
+            r_h_true_list1 = r_h_list[mask1]
+            for j in range(len(r_h_true_list1)):
+                count += 1
+                longitude, latitude =  self.geodetic_position_observed(r_h_true_list1[j], theta)
+                latitude_list = np.append(latitude_list, latitude)
+                longitude_list = np.append(longitude_list, longitude)
+
+            # 掩蔽終了時
+            mask2 = ~is_occultated_list & prev_is_occultated_list & mask_tri
+            r_h_true_list2 = r_h_list[mask2]
+            for j in range(len(r_h_true_list2)):
+                count += 1
+                longitude, latitude =  self.geodetic_position_observed(r_h_true_list2[j], theta)
+                latitude_list = np.append(latitude_list, latitude)
+                longitude_list = np.append(longitude_list, longitude)
+
+            prev_is_occultated_list[is_occultated_list] = True
+            prev_is_occultated_list[~is_occultated_list] = False
+            is_first_list[is_occultated_list] = False
+            is_first_list[~is_occultated_list] = True
+            
+            t += dt
+            theta += dt * self.planet.rotation_omega
+
+        return longitude_list, latitude_list, count
