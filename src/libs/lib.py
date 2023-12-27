@@ -750,6 +750,7 @@ class PlanetsTransOrbit():
         self.calculator_end = TrajectoryCalculator(planet_end.planet_name)
         self.calculator_sun = TrajectoryCalculator("Sun")
         self.lambert = LambertSolver()
+        self.lambert_planet_end = LambertSolver(center_planet=planet_end.planet_name)
         self.values = Values()
     
     def launch_window_period(self, JS):
@@ -979,8 +980,9 @@ class PlanetsTransOrbit():
         v_inf_start = v_sat_start - v_planet_start
         return r_start, v_sat_start, v_planet_start,r_tcm, v_sat_before_tcm, v_sat_after_tcm, r_end, v_sat_end, v_planet_end
     
-    def trajectory_trans2planetary(self,theta_rad,r_h,v_B_vec,JS):
+    def trajectory_trans2planetary(self,theta_rad,r_h,v_B_vec,JS,r_a):
         """
+        use coapsidal capture orbit for planetary orbit
         input-------------------
         theta_rad : double
             angle between B and T_hat
@@ -990,7 +992,28 @@ class PlanetsTransOrbit():
             v_in(sun centered)
         JS : double
             time entering target planet gravity field   
+        r_a : double
+            apogee distance for coapsidal capture orbit
         """
+        _,_,r_h_vec, v_h_vec, oes = self.swingby(self.planet_end,theta_rad, r_h, v_B_vec, JS)
+        _,_,i,omega,Omega = oes
+        r_h = np.linalg.norm(r_h_vec)
+        v_h = np.linalg.norm(v_h_vec)
+        delta_v = v_h - (self.planet_end.mu * (2/r_h - 2/(r_h + r_a)))
+        e = (r_a + r_h) / (r_a - r_h)
+        p = r_a * (1 - e)
+        a = p / (1 - e**2)
+        t_p = JS # fix me!!!!! need to add (time for finish swingby) /2
+        return delta_v, a, e, i, omega, Omega, t_p
+    
+    def trajectory_planetary2observation(self, oe_planetary, oe_observation, JS1, JS2):
+        r_start, v_start = self.calculator_start.calc_r_v_from_orbital_elems(*oe_planetary, JS1)
+        r_end, v_end = self.calculator_end.calc_r_v_from_orbital_elems(*oe_observation, JS2)
+        self.lambert.set_variables(r_start, r_end, JS1, JS2)
+        _, _, _, nu_1_rad, nu_2_rad,v_lambert_start,v_lambert_end = self.lambert_planet_end.solve_lambert()
+        dv1 = np.linalg.norm(v_start - v_lambert_start)
+        dv2 = np.linalg.norm(v_end - v_lambert_end)
+        return dv1, dv2, nu_1_rad, nu_2_rad,v_lambert_start,v_lambert_end
 
 class Satellite():
     def __init__(self, planet, calculator = TrajectoryCalculator):
@@ -1002,7 +1025,6 @@ class Satellite():
 
     def init_orbit_by_rv(self, r_vec ,v_vec, t0):
         self.orbital_elems = np.array([self.calculator.calc_orbital_elems_from_r_v(self, r_vec ,v_vec, t0)])
-
     def get_rv(self, t):
         r, v = self.calculator.calc_r_v_from_orbital_elems(*self.orbital_elems, t)
         return r, v
