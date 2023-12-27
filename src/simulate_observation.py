@@ -1,5 +1,3 @@
-import sys
-sys.path.append("Design-Optimization")
 from libs.lib import Values, TrajectoryCalculator, Planet, Satellite, Occultation
 
 import numpy as np
