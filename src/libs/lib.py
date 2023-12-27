@@ -288,7 +288,28 @@ class TrajectoryCalculator():
         
         return P_hat_vec, Q_hat_vec, W_hat_vec
     
-    def calc_r_v_from_orbital_elems(self,a,e,i,omega,Omega,t_p,t):
+    def calc_r_v_form_r_v_0(self, r_vec0, v_vec0, JS0, JS):
+        """
+        calc (r,v) at JS from (r0,v0) at JS0
+        input--------------------------
+        r_vec0 : 3*1 ndarray(double)
+            時刻JS0のrの値(km)
+        v_vec0 : 3*1 ndarray(double)
+            時刻JS0のvの値(km/s)
+        JS0 : double
+            initial time(s)
+        JS : double
+            time of returned r,v
+        return--------------------------
+        r_vec : 3*1 ndarray(double)
+            時刻JSのrの値(km)
+        v_vec : 3*1 ndarray(double)
+            時刻JSのvの値(km/s)
+        """
+        a,e,i,omega,Omega,t_p,_,_,_ = self.calc_orbital_elems_from_r_v(self, r_vec0 ,v_vec0, JS0)
+        return self.calc_r_v_from_orbital_elems(self,a,e,i,omega,Omega,t_p,JS)
+    
+    def calc_r_v_from_orbital_elems(self,a,e,i,omega,Omega,t_p,JS):
         """
         軌道要素からある時刻のr,vを求める
         引数--------------------------
@@ -303,14 +324,14 @@ class TrajectoryCalculator():
         Omega : double
             昇交点離角(deg)
         t_p : double
-            近地点通過時刻(s)
-        t : double
+            近地点通過時刻(JS,s)
+        JS : double
             r,vを求めたい時刻(s)
         返り値--------------------------
         r_vec : 3*1 ndarray(double)
-            時刻tのrの値(km)
+            時刻JSのrの値(km)
         v_vec : 3*1 ndarray(double)
-            時刻tのvの値(km/s)
+            時刻JSのvの値(km/s)
         """
         omega_rad = np.radians(omega)
         Omega_rad = np.radians(Omega)
@@ -320,21 +341,21 @@ class TrajectoryCalculator():
         p = a * (1 - e**2)
         #楕円の場合
         if (a > 0):
-            E = self.solve_Kepler(a,e,t_p,t,100)
+            E = self.solve_Kepler(a,e,t_p,JS,100)
             E_rad = np.radians(E)
             r = a * (1 - e * np.cos(E_rad))
             r_vec = a * (np.cos(E_rad) - e) * P_hat_vec + (a * p)**0.5 * np.sin(E_rad) * Q_hat_vec
             v_vec = -(a * self.mu)**0.5 / r * np.sin(E_rad) * P_hat_vec + (self.mu * p)**0.5 / r * np.cos(E_rad) * Q_hat_vec
         #双曲線の場合（放物線は考えない）
         else:
-            H = self.solve_hyperbola_eq(a,e,t_p,t,100)
+            H = self.solve_hyperbola_eq(a,e,t_p,JS,100)
             H_rad = np.radians(H)
             r = a * (1 - e * np.cosh(H_rad))
             r_vec = a * (np.cosh(H_rad) - e) * P_hat_vec + (- a * p)**0.5 * np.sinh(H_rad) * Q_hat_vec
             v_vec = -(-a * self.mu)**0.5 / r * np.sinh(H_rad) * P_hat_vec + (self.mu * p)**0.5 / r * np.cosh(H_rad) * Q_hat_vec
         return r_vec, v_vec
     
-    def calc_orbital_elems_from_r_v(self, r_vec ,v_vec, t,
+    def calc_orbital_elems_from_r_v(self, r_vec ,v_vec, JS,
                                 i_hat_vec = np.array([[1],[0],[0]]), j_hat_vec= np.array([[0],[1],[0]]), k_hat_vec= np.array([[0],[0],[1]])):
         """
         ある時刻のr,vから軌道要素を求める
@@ -343,7 +364,7 @@ class TrajectoryCalculator():
             rの値(km)
         v_vec : 3*1 ndarray(double)
             vの値(km/s)
-        t : double
+        JS : double
             時刻(s)
         i_hat_vec : 3*1 ndarray(double)
             赤道面の春分点方向基準ベクトル
@@ -363,7 +384,7 @@ class TrajectoryCalculator():
         Omega : double
             昇交点離角(deg)
         t_p : double
-            近地点通過時刻(s)
+            近地点通過時刻(JS,s)
         P_hat_vec : ndarraty
             基準ベクトル
         W_hat_vec : ndarraty
@@ -389,10 +410,10 @@ class TrajectoryCalculator():
             omega = 360 - omega
         if (a > 0): #楕円の場合
             E_rad  = np.arctan2(np.dot(r_vec.T, v_vec) / (self.mu * a)**0.5, (1 - r / a))
-            t_p = t - (a**3 / self.mu)**0.5 * (E_rad - e * np.sin(E_rad))
+            t_p = JS - (a**3 / self.mu)**0.5 * (E_rad - e * np.sin(E_rad))
         else: #双曲線の場合
             H_rad  = np.arcsinh(np.dot(r_vec.T, v_vec) / (self.mu * -a)**0.5 / e)
-            t_p = t - (-a**3 / self.mu)**0.5 * (e * np.sin(H_rad) - H_rad)
+            t_p = JS - (-a**3 / self.mu)**0.5 * (e * np.sin(H_rad) - H_rad)
         return float(a),float(e),float(i),float(omega),float(Omega),float(t_p),P_hat_vec, Q_hat_vec,W_hat_vec
 
     def eci2ecef(self, r, theta):
@@ -507,7 +528,7 @@ class Planet():
 
 class LambertSolver():
     """
-    ランベルト問題を解くための関数群を保持。軌道計算ごとにインスタンスを定義すること
+    ランベルト問題を解くための関数群を保持。
     """
     def __init__(self, k_hat_vec = np.array([[0.],[0.],[1.]]),values = Values(), center_planet = 'Sun'):
         self.mu = values.mu(center_planet)
@@ -664,6 +685,24 @@ class LambertSolver():
     def solve_lambert(self):
         """
         ランベルト問題を解く関数
+        output--------------------------
+        a : double
+            semi-major axis(sun centered)
+        e : double
+            eccentricity(sun centered)
+        p : double
+        nu_1_rad : double
+            nu at the orbit insertion(sun centered)
+        nu_2_rad : double
+            nu when a sat achieves target planet(sun centered)
+        r_start : 3*1 ndarray(double)
+            position at the orbit insertion(sun centered)
+        r_end : 3*1 ndarray(double)
+            position when a sat achieves target planet(sun centered)
+        v1_vec : 3*1 ndarray(double)
+            velocity of a sat at the orbit insetion(sun centered)
+        v2_vec : 3*1 ndarray(double)
+            velocity of a sat when achieved target planet(sun centered)
         """
         #形状などを判断
         self.set_flag_delta_nu_is_under_180()
@@ -714,6 +753,15 @@ class PlanetsTransOrbit():
         self.values = Values()
     
     def launch_window_period(self, JS):
+        """
+        calc the period between launch windows
+        input--------------------------
+        JS : double
+            reference time for planet orbital elements
+        output--------------------------
+        period : double
+            the period between launch windows
+        """
         JD = JS / 24 / 60 / 60
         T_TDB = (JD - 2451545.0) / 36525.0
         a_start = self.values.a(self.planet_start.planet_name, T_TDB)
@@ -810,6 +858,139 @@ class PlanetsTransOrbit():
         for i in range(num):
             sol[i] =  np.array([self.values.convert_JD_to_times(JD_array[i])])
         return sol
+    
+    def swingby(self,planet,theta_rad,r_h,v_B_vec,JS):
+        """
+        input-------------------
+        planet : Planet
+            planet used for swingby
+        theta_rad : double
+            angle between B and T_hat
+        r_h : double
+            distance from planet at closest approach
+        v_B_vec : 3*1 ndarray
+            v_in(sun centered)
+        JS : double
+            time starting swingby    
+        """
+        k_hat_vec = np.array([[0],[0],[1]])
+        r_planet_vec,v_planet_vec = planet.position_JS(JS) 
+        v_inf_in_vec = v_B_vec - v_planet_vec 
+        v_inf = np.linalg.norm(v_inf_in_vec)
+
+        # calc orbital elements(planet centered)
+        a = - planet.mu / v_inf**2
+        e = 1 + r_h * v_inf**2 / planet.mu
+        v_h = (2 * planet.mu / r_h + v_inf**2)**0.5
+
+        # calc b
+        phi_B_rad = 2 * np.arcsin(1 / (1 + r_h * v_inf**2 / planet.mu))
+        b = r_h * (1 + 2 * planet.mu / r_h / v_inf**2 )
+
+        # calc unit vectors and B vector
+        S_I_hat_vec = v_inf_in_vec / v_inf
+        lambda_I_rad = np.arctan2(S_I_hat_vec[1],S_I_hat_vec[0])
+        if (lambda_I_rad < 0):
+            lambda_I_rad = lambda_I_rad + np.pi * 2
+        beta_I = np.arcsin(S_I_hat_vec[2])
+        T_I_hat_vec = np.array([[S_I_hat_vec[1][0] / (S_I_hat_vec[0][0]**2 + S_I_hat_vec[1][0]**2)**0.5],[-S_I_hat_vec[0][0] / (S_I_hat_vec[0][0]**2 + S_I_hat_vec[1][0]**2)**0.5],[0]])
+        R_hat_vec = np.cross(S_I_hat_vec.T,T_I_hat_vec.T).T
+        B_vec = np.array([[b / (S_I_hat_vec[0][0]**2 + S_I_hat_vec[1][0]**2)**0.5 * (S_I_hat_vec[1][0]*np.cos(theta_rad) + S_I_hat_vec[0][0]*S_I_hat_vec[2][0]*np.sin(theta_rad))],
+                          [b / (S_I_hat_vec[0][0]**2 + S_I_hat_vec[1][0]**2)**0.5 * (-S_I_hat_vec[0][0]*np.cos(theta_rad) + S_I_hat_vec[1][0]*S_I_hat_vec[2][0]*np.sin(theta_rad))],
+                          [- b * (S_I_hat_vec[0][0]**2 + S_I_hat_vec[1][0]**2)**0.5 * np.sin(theta_rad)]])
+        v_inf_out_vec = v_inf * (np.cos(phi_B_rad) * S_I_hat_vec - np.sin(phi_B_rad) * B_vec / b)
+
+        # calc out direction
+        S_O_hat_vec = v_inf_out_vec / v_inf
+        W_hat_vec = np.cross(S_I_hat_vec.T,S_O_hat_vec.T).T / np.linalg.norm(np.cross(S_I_hat_vec.T,S_O_hat_vec.T).T)
+        N_hat_vec = np.cross(k_hat_vec.T,W_hat_vec.T).T / np.linalg.norm(np.cross(k_hat_vec.T,W_hat_vec.T))
+
+        # calc remaining orbital elements
+        i = np.arccos(np.dot(W_hat_vec.T,k_hat_vec))
+        Omega = np.arctan2(- W_hat_vec[1][0]/(W_hat_vec[0][0]**2 + W_hat_vec[1][0]**2)**0.5, W_hat_vec[0][0]/(W_hat_vec[0][0]**2 + W_hat_vec[1][0]**2)**0.5)
+        if (Omega < 0):
+            Omega = Omega + 2 * np.pi
+        r_h_vec = r_h  * (np.sin(phi_B_rad/2) * S_I_hat_vec + np.cos(phi_B_rad) * B_vec / b)
+        v_h_vec = v_h  * (np.cos(phi_B_rad/2) * S_I_hat_vec - np.sin(phi_B_rad) * B_vec / b)
+        omega = np.arctan2(np.dot(N_hat_vec.T,r_h_vec)/r_h, np.dot(np.cross(W_hat_vec.T, N_hat_vec.T), r_h_vec)/r_h)
+        oes = (a,e,i,omega,Omega)
+        return v_inf_out_vec, v_inf_out_vec+v_planet_vec, r_h_vec, v_h_vec, oes
+    
+    def trajectory_by_lambert(self, time_start, duration):
+        """
+        calc the trajectory between planets by solving lambert
+        input--------------------------
+        time_start : 6 tuple(double)
+            time at orbit insertion(y,m,d,h,m,s)
+        duration : double
+            time to trans(s)
+        output--------------------------
+        nu_1_rad : double
+            nu at the orbit insertion(sun centered)
+        nu_2_rad : double
+            nu when a sat achieves target planet(sun centered)
+        r_start : 3*1 ndarray(double)
+            position at the orbit insertion(sun centered)
+        r_end : 3*1 ndarray(double)
+            position when a sat reaches target planet(sun centered)
+        v_planet_start : 3*1 ndarray(double)
+            velocity of a planet at the orbit insetion(sun centered)
+        v_planet_end : 3*1 ndarray(double)
+            velocity of a planet when reached target planet(sun centered)
+        v_sat_start : 3*1 ndarray(double)
+            velocity of a sat at the orbit insetion(sun centered)
+        v_sat_end : 3*1 ndarray(double)
+            velocity of a sat when reached target planet(sun centered)
+        """
+        JS_start, _, _ = self.values.convert_times_to_T_TDB(self, *time_start)
+        JS_end = JS_start + duration
+        r_start, v_planet_start = self.planet_start.position_JS(JS_start)
+        r_end, v_planet_end = self.planet_end.position_JS(JS_end)
+        self.lambert.set_variables(r_start, r_end, JS_start, JS_end)
+        _, _, _, nu_1_rad, nu_2_rad,v_sat_start,v_sat_end = self.lambert.solve_lambert()
+        delta_v1 = np.linalg.norm(v_planet_start - v_sat_start)
+        delta_v2 = np.linalg.norm(v_planet_end - v_sat_end)
+        return nu_1_rad, nu_2_rad,r_start,r_end,v_planet_start,v_planet_end,v_sat_start,v_sat_end
+    
+    def trajectory_with_1TCM(self, time_start, time_end, time_tcm, v_inf_end):
+        """
+        calc the trajectory which reaches given v_inf_end with 1 TCM
+        input--------------------------
+        time_start : 6 tuple(double)
+            time at the orbit insertion(y,m,d,h,m,s)
+        time_end : 6 tuple(double)
+            time when a sat reaches target planet(y,m,d,h,m,s)
+        time_tcm : 6 tuple(double)
+            time at the tcm(y,m,d,h,m,s)
+        v_inf_end : 3*1 ndarray(double)
+            velocity when a sat reached the target planet(taget planet centered)
+        """
+        JS_start, _, _ = self.values.convert_times_to_T_TDB(self, *time_start)
+        JS_end, _, _ = self.values.convert_times_to_T_TDB(self, *time_end)
+        JS_tcm, _, _ = self.values.convert_times_to_T_TDB(self, *time_tcm)
+        r_start, v_planet_start = self.planet_start.position_JS(JS_start)
+        r_end, v_planet_end = self.planet_end.position_JS(JS_end)
+        # after tcm
+        v_sat_end = v_planet_end + v_inf_end
+        r_tcm, v_sat_after_tcm = self.calculator_sun.calc_r_v_form_r_v_0(r_end, v_sat_end, JS_end, JS_tcm)
+        # before tcm
+        self.lambert.set_variables(r_start, r_tcm, JS_start, JS_tcm)
+        _, _, _, nu_1_rad, nu_2_rad,v_sat_start,v_sat_before_tcm = self.lambert.solve_lambert()
+        v_inf_start = v_sat_start - v_planet_start
+        return r_start, v_sat_start, v_planet_start,r_tcm, v_sat_before_tcm, v_sat_after_tcm, r_end, v_sat_end, v_planet_end
+    
+    def trajectory_trans2planetary(self,theta_rad,r_h,v_B_vec,JS):
+        """
+        input-------------------
+        theta_rad : double
+            angle between B and T_hat
+        r_h : double
+            distance from planet at closest approach
+        v_B_vec : 3*1 ndarray
+            v_in(sun centered)
+        JS : double
+            time entering target planet gravity field   
+        """
 
 class Satellite():
     def __init__(self, planet, calculator = TrajectoryCalculator):
