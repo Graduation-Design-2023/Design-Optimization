@@ -172,7 +172,7 @@ class Values():
         "Uranus" : -0.71833 * 60**2 * 24,
         "Neptune": 0.67125 * 60**2 * 24}
         return rotation_period_dic[planet_name]
-    
+        
 class TrajectoryCalculator(): 
     """
     軌道を求めるための計算機。中心天体ごとにインスタンスを作ること。
@@ -509,7 +509,11 @@ class LambertSolver():
     """
     ランベルト問題を解くための関数群を保持。軌道計算ごとにインスタンスを定義すること
     """
-    def __init__(self,r1_vec,r2_vec,t1,t2,k_hat_vec = np.array([[0.],[0.],[1.]]),values = Values()):
+    def __init__(self, k_hat_vec = np.array([[0.],[0.],[1.]]),values = Values(), center_planet = 'Sun'):
+        self.mu = values.mu(center_planet)
+        self.k_hat_vec = k_hat_vec
+
+    def set_variables(self,r1_vec,r2_vec,t1,t2):
         """
         引数--------------------------
         r1_vec : 3*1 ndarray
@@ -521,14 +525,12 @@ class LambertSolver():
         t2 : double
             到着時刻
         """
-        self.mu = values.mu("Sun")
         self.r1_vec = r1_vec
         self.r2_vec = r2_vec
         self.r1 = np.linalg.norm(r1_vec)
         self.r2 = np.linalg.norm(r2_vec)
         self.t1 = t1
         self.t2 = t2
-        self.k_hat_vec = k_hat_vec
         self.delta_t = t2 - t1 #飛行時間
         self.c = np.linalg.norm(r2_vec - r1_vec) #2点間距離
         self.s = (self.r1 + self.r2 + self.c) / 2. 
@@ -558,7 +560,7 @@ class LambertSolver():
         else:
             delta_t_p = 1. / 3. * (2. / self.mu)**0.5 * (self.s**1.5 + (self.s - self.c)**1.5) #放物線軌道の遷移時間
             self.is_ellipse = self.delta_t > delta_t_p
-    
+
     def set_flag_focus_is_same_side(self, delta_nu_is_under_180):
         """
         楕円軌道で焦点が同じ側にあるか判断し、focus_is_same_sideをセット
@@ -652,7 +654,7 @@ class LambertSolver():
                 rho = 0.9*rho
             a = a + rho * (self.delta_t - self.calc_delta_t(a)) / self.calc_d_da_delta_t(a)
             n = n + 1
-            if(n>1000):
+            if(n > 1000):
                 print("can't calculate",self.t1,self.t2)
                 break
         if (not self.is_ellipse):
@@ -700,6 +702,114 @@ class LambertSolver():
         v1_vec = 1 / g * (self.r2_vec - f * self.r1_vec)
         v2_vec = 1 / g * (g_dot * self.r2_vec - self.r1_vec)
         return a, e, p, float(nu_1_rad), float(nu_2_rad),v1_vec,v2_vec
+    
+class PlanetsTransOrbit():
+    def __init__(self, planet_start, planet_end, calculator = TrajectoryCalculator, lambert = LambertSolver, values = Values):
+        self.planet_start = planet_start
+        self.planet_end = planet_end
+        self.calculator_start = TrajectoryCalculator(planet_start.planet_name)
+        self.calculator_end = TrajectoryCalculator(planet_end.planet_name)
+        self.calculator_sun = TrajectoryCalculator("Sun")
+        self.lambert = LambertSolver()
+        self.values = Values()
+    
+    def launch_window_period(self, JS):
+        JD = JS / 24 / 60 / 60
+        T_TDB = (JD - 2451545.0) / 36525.0
+        a_start = self.values.a(self.planet_start.planet_name, T_TDB)
+        a_end = self.values.a(self.planet_end.planet_name, T_TDB)
+        mu = self.values.mu('Sun')
+        n_start = (mu / a_start**3)**0.5
+        n_end = (mu / a_end**3)**0.5
+        period = 2 * np.pi / np.abs(n_start - n_end)
+        return period
+
+
+    def calc_nu_between_planets(self, JS):
+        """
+        calculate angle between planets at givem JS
+        input--------------------------
+        JS : double
+            time when angle is calculated
+        output--------------------------
+        nu : double
+            angle between planets (0 ~ 360 deg)
+        """
+        r_vec_start, _ = self.planet_start.position_JS(JS)
+        r_vec_end, _ = self.planet_end.position_JS(JS)
+        r_vec_start[2] = 0
+        r_vec_end[2] = 0
+        cos = np.dot(r_vec_start.T, r_vec_end) / np.linalg.norm(r_vec_start) / np.linalg.norm(r_vec_end)
+        nu_rad = np.arccos(cos)
+        nu_deg = np.rad2deg(nu_rad)
+        outer = np.cross(r_vec_start[:,0], r_vec_end[:,0])
+        if (outer[2] > 0):
+            return nu_deg
+        else:
+            return -nu_deg + 360
+        
+    def delta_nu(self, JS):
+        JD = JS / 24 / 60 / 60
+        T_TDB = (JD - 2451545.0) / 36525.0
+        a_start = self.values.a(self.planet_start.planet_name, T_TDB)
+        a_end = self.values.a(self.planet_end.planet_name, T_TDB)
+        mu = self.values.mu("Sun")
+        t_H = np.pi * ((a_start + a_end)**3 / 8 / mu)**0.5
+        n_end = (mu / a_end**3)**0.5
+        delta_nu_rad = np.pi - n_end * t_H
+        return np.rad2deg(delta_nu_rad)
+    
+    def calc_launch_window(self, year_first, month_first, date_first, threshold, num):
+        """
+        calculate launch windows by binory search
+        input--------------------------
+        year_first, month_start, date_start : int
+            start time of iteration to calculate launch window
+        threshold : double
+            threshold of iteration to calculate launch window
+        num : double
+            number of launch windows you need
+        output--------------------------
+        sol : num*1 ndarray(double)
+            num launch windows
+        """
+        JS_start, _, _ = self.values.convert_times_to_T_TDB(year_first, month_first, date_first, 0, 0, 0)
+        period = self.launch_window_period(JS_start)
+        JS_last = JS_start + period
+        JS_mid = (JS_last + JS_start) / 2
+
+        count = 0
+
+        nu_start = self.calc_nu_between_planets(JS_start)
+        delta_nu = self.delta_nu(JS_start)
+        nu_mid = self.calc_nu_between_planets(JS_mid)
+        sign_delta_nu = delta_nu / np.abs(delta_nu)
+
+        if (nu_start > delta_nu):
+            delta_nu += 360
+        if (nu_start > nu_mid):
+            nu_mid += 360
+
+        while(np.abs(nu_mid - delta_nu) > threshold):
+            if(sign_delta_nu * (nu_mid - delta_nu) > 0):
+                JS_start = JS_mid
+            else:
+                JS_last = JS_mid
+            
+            JS_mid = (JS_last + JS_start) / 2
+            nu_mid = self.calc_nu_between_planets(JS_mid)
+            if (nu_start > nu_mid):
+                nu_mid += 360
+            count += 1
+            if(count > 1000):
+                print("exceed max num of iteration")
+                break
+        JS_array = np.arange(JS_mid, JS_mid+num*period, period)
+        JD_array = JS_array / 24 / 60 / 60
+        sol = np.zeros((num,6))
+        for i in range(num):
+            sol[i] =  np.array([self.values.convert_JD_to_times(JD_array[i])])
+        return sol
 
 class Satellite():
     def __init__(self, planet, calculator = TrajectoryCalculator):
