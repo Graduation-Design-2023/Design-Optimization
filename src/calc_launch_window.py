@@ -1,4 +1,6 @@
-from libs.lib import Values, TrajectoryCalculator, Planet, Satellite, Occultation, PlanetsTransOrbit
+from libs.lib import Values, TrajectoryCalculator, Planet
+from libs.occultation_lib import Satellite, Occultation
+from libs.interplanetary_lib import PlanetsTransOrbit
 
 import numpy as np
 from matplotlib import pyplot as plt
