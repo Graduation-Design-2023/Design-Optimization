@@ -191,6 +191,31 @@ class TrajectoryCalculator():
         self.threshold = threshold
         self.mu = self.values.mu(center_planet_name)
 
+    def calc_rv_from_nu(self, nu, a, e, P_hat_vec, Q_hat_vec):
+        nu_rad = np.deg2rad(nu)
+        p = a * (1 - e**2)
+        v_vec = (self.mu / p)**0.5(- np.sin(nu_rad) * P_hat_vec + (e + np.cos(nu_rad) * Q_hat_vec))
+        return v_vec
+
+    def calc_nu_from_r_vec(self, r_vec, P_hat_vec, Q_hat_vec):
+        r_P = np.dot(r_vec.T, P_hat_vec)
+        r_Q = np.dot(r_vec.T, Q_hat_vec)
+        nu_rad = np.arctan2(r_Q, r_P)
+        nu = np.rad2deg(nu_rad)
+        return nu
+
+    def calc_time_from_r_vec(self, r_vec, P_hat_vec, Q_hat_vec, a, e, t_p):
+        r = np.linalg.norm(r_vec)
+        nu = self.calc_nu_from_r_vec(r_vec, P_hat_vec, Q_hat_vec)
+        nu_rad = np.deg2rad(nu)
+        cosE = r * np.cos(nu_rad) / a + e
+        sinE = r * np.sin(nu_rad) / (a * (1 - e**2))
+        E_rad = np.arctan2(sinE, cosE)
+        n_rad = (self.mu / a**3)
+        delta_t = (E_rad - e * sinE) / n_rad
+        t = delta_t + t_p
+        return t
+
     def solve_Kepler(self,a,e,t_p,t,E0):
         """
         ニュートンラフソン法でケプラー方程式を解く
@@ -453,6 +478,26 @@ class TrajectoryCalculator():
         latitude = np.degrees(latitude_rad)
 
         return longitude, latitude
+    
+    def plot_trajectory(self, r_vec, v_vec, JS, nu_start, nu_end):
+        if(nu_start > nu_end):
+            nu_end = nu_end + 360
+        a,e,i,omega,Omega,t_p,P_hat_vec, Q_hat_vec, W_hat_vec = self.calc_6elements_from_r_v(r_vec,v_vec,JS)
+        p = a * (1 - e**2)
+        nu_start_rad = np.deg2rad(nu_start)
+        nu_end_rad = np.deg2rad(nu_end)
+        nu = np.arange(nu_start_rad, nu_end_rad,.01)
+        r = p / (1 + e * np.cos(nu))
+        x = r*np.cos(nu)*P_hat_vec[0] + r*np.sin(nu)*Q_hat_vec[0]
+        y = r*np.cos(nu)*P_hat_vec[1] + r*np.sin(nu)*Q_hat_vec[1]
+        z = r*np.cos(nu)*P_hat_vec[2] + r*np.sin(nu)*Q_hat_vec[2]
+        fig = plt.figure()
+        ax = fig.add_subplot(111,projection = '3d')
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+        ax.set_zlabel("z")
+        ax.plot(x,y,z,color = "k")
+        ax.view_init(elev=0, azim=70)
     
 class Planet():
     """
