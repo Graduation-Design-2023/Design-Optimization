@@ -1,6 +1,4 @@
 # github-template
 Cansat2022 2班のgithubテンプレート 
-
-軌道計算用のコード
-
-https://drive.google.com/drive/u/0/folders/1L7HCQrXnF_PUHj_Uh0S5pnJcoBn2REGF
+# 火星軌道投入
+https://www.notion.so/27b17d4f145b4683b6bb1a85881f6d89
