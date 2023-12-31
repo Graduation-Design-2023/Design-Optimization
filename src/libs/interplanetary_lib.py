@@ -664,5 +664,5 @@ class PlanetsTransOrbit():
         self.calculator_end.plot_trajectory(r_01_vec, v0_end_vec, JS, -70, 0, ax)
         self.calculator_end.plot_trajectory(r_01_vec, v1_start_vec, JS, nu1_start, nu1_end, ax, 'k')
         self.calculator_end.plot_trajectory(r_12_vec, v2_start_vec, JS1_end, nu2_start, nu2_end, ax, 'r')
-        self.calculator_end.plot_trajectory(r_23_vec, v3_start_vec, JS2_end, nu3_start, nu3_start-0.1, ax, 'b')
+        self.calculator_end.plot_trajectory(r_23_vec, v3_start_vec, JS2_end, nu3_start, nu3_start+360, ax, 'b')
         plt.show()
