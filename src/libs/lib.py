@@ -498,14 +498,13 @@ class TrajectoryCalculator():
         return longitude, latitude
     
     def plot_trajectory(self, r_vec, v_vec, JS, nu_start, nu_end, ax, col = 'k'):
+        if(nu_start > nu_end):
+            nu_end += 360
         a,e,i,omega,Omega,t_p,P_hat_vec, Q_hat_vec, W_hat_vec = self.calc_orbital_elems_from_r_v(r_vec,v_vec,JS)
         p = a * (1 - e**2)
         nu_start_rad = np.deg2rad(nu_start)
         nu_end_rad = np.deg2rad(nu_end)
-        if(nu_start < nu_end):
-            nu = np.arange(nu_start_rad, nu_end_rad,.01)
-        else:
-            nu = np.arange(nu_end_rad, nu_start_rad,.01)
+        nu = np.arange(nu_start_rad, nu_end_rad,.01)
         r = p / (1 + e * np.cos(nu))
         x = r*np.cos(nu)*P_hat_vec[0] + r*np.sin(nu)*Q_hat_vec[0]
         y = r*np.cos(nu)*P_hat_vec[1] + r*np.sin(nu)*Q_hat_vec[1]
