@@ -191,6 +191,60 @@ class TrajectoryCalculator():
         self.threshold = threshold
         self.mu = self.values.mu(center_planet_name)
 
+    def calc_rv_from_nu(self, nu, a, e, P_hat_vec, Q_hat_vec):
+        """
+        calc position and velocity from true anomaly
+        nu : double
+            true anomaly
+        a : double
+            semi major axis
+        e : double
+            eccentricity
+        P_hat_vec : 3*1 ndarray(double)
+        Q_hat_vec : 3*1 ndarray(double)
+        """
+        nu_rad = np.deg2rad(nu)
+        p = a * (1 - e**2)
+        v_vec = (self.mu / p)**0.5 * (- np.sin(nu_rad) * P_hat_vec + (e + np.cos(nu_rad) * Q_hat_vec))
+        return v_vec
+
+    def calc_nu_from_r_vec(self, r_vec, P_hat_vec, Q_hat_vec, check_threshold=0.001):
+        r_P = np.dot(r_vec.T, P_hat_vec)
+        r_Q = np.dot(r_vec.T, Q_hat_vec)
+        W_hat_vec = np.cross(P_hat_vec.T, Q_hat_vec.T)
+        if (np.abs(np.dot(W_hat_vec, r_vec)) > check_threshold ):
+            print("plane is invalid")
+            print(np.dot(W_hat_vec, r_vec))
+        nu_rad = np.arctan2(r_Q, r_P)
+        nu = np.rad2deg(nu_rad)
+        return nu
+    
+    def calc_period(self, a):
+        if(a > 0):
+            n_rad = (self.mu / a**3)**0.5
+        else:
+            n_rad = (-self.mu / a**3)**0.5
+        return 2 * np.pi / n_rad
+
+    def calc_time_from_r_vec(self, r_vec, P_hat_vec, Q_hat_vec, a, e, t_p):
+        r = np.linalg.norm(r_vec)
+        nu = self.calc_nu_from_r_vec(r_vec, P_hat_vec, Q_hat_vec)
+        nu_rad = np.deg2rad(nu)
+        if (a > 0):
+            cosE = r * np.cos(nu_rad) / a + e
+            sinE = r * np.sin(nu_rad) / (a * (1 - e**2)**0.5)
+            E_rad = np.arctan2(sinE, cosE)
+            n_rad = (self.mu / a**3)**0.5
+            delta_t = (E_rad - e * sinE) / n_rad
+        else:
+            coshH = (-r / a + 1) / e
+            sinhH = np.sin(nu_rad) * (e * coshH - 1)
+            H_rad = np.arcsinh(sinhH)
+            n_rad = (-self.mu / a**3)**0.5
+            delta_t = (e * sinhH - H_rad) / n_rad
+        t = delta_t + t_p
+        return t
+
     def solve_Kepler(self,a,e,t_p,t,E0):
         """
         ニュートンラフソン法でケプラー方程式を解く
@@ -237,11 +291,11 @@ class TrajectoryCalculator():
             時刻tのHの値(deg)
         """
         H_pre_rad = np.radians(H0)
-        H_rad = H_pre_rad - (e * np.sinh(H_pre_rad) - H_pre_rad - (self.mu / -a**3)**0.5 *(t - t_p)) / (e * np.cosh(H_pre_rad) - 1)
-        while(np.abs(H_pre_rad - H_pre_rad) >= self.threshold):
-            H_pre_rad = H_pre_rad
-            H_pre_rad = H_pre_rad - (e * np.sinh(H_pre_rad) - H_pre_rad - (self.mu / -a**3)**0.5 *(t - t_p)) / (e * np.cosh(H_pre_rad) - 1)
-        return np.degrees(H_rad)
+        H_rad = H_pre_rad - (e * np.sinh(H_pre_rad) - H_pre_rad - (self.mu / -a**3)**0.5 * (t - t_p)) / (e * np.cosh(H_pre_rad) - 1)
+        while(np.abs(H_pre_rad - H_rad) >= self.threshold):
+            H_pre_rad = H_rad
+            H_rad = H_pre_rad - (e * np.sinh(H_pre_rad) - H_pre_rad - (self.mu / -a**3)**0.5 *(t - t_p)) / (e * np.cosh(H_pre_rad) - 1)
+        return np.rad2deg(H_rad)
     
     def calc_PQW_from_orbital_elems(self,a,e,i,omega,Omega,t_p):
         """
@@ -288,7 +342,28 @@ class TrajectoryCalculator():
         
         return P_hat_vec, Q_hat_vec, W_hat_vec
     
-    def calc_r_v_from_orbital_elems(self,a,e,i,omega,Omega,t_p,t):
+    def calc_r_v_form_r_v_0(self, r_vec0, v_vec0, JS0, JS):
+        """
+        calc (r,v) at JS from (r0,v0) at JS0
+        input--------------------------
+        r_vec0 : 3*1 ndarray(double)
+            時刻JS0のrの値(km)
+        v_vec0 : 3*1 ndarray(double)
+            時刻JS0のvの値(km/s)
+        JS0 : double
+            initial time(s)
+        JS : double
+            time of returned r,v
+        return--------------------------
+        r_vec : 3*1 ndarray(double)
+            時刻JSのrの値(km)
+        v_vec : 3*1 ndarray(double)
+            時刻JSのvの値(km/s)
+        """
+        a,e,i,omega,Omega,t_p,_,_,_ = self.calc_orbital_elems_from_r_v(self, r_vec0 ,v_vec0, JS0)
+        return self.calc_r_v_from_orbital_elems(self,a,e,i,omega,Omega,t_p,JS)
+    
+    def calc_r_v_from_orbital_elems(self,a,e,i,omega,Omega,t_p,JS):
         """
         軌道要素からある時刻のr,vを求める
         引数--------------------------
@@ -303,14 +378,14 @@ class TrajectoryCalculator():
         Omega : double
             昇交点離角(deg)
         t_p : double
-            近地点通過時刻(s)
-        t : double
+            近地点通過時刻(JS,s)
+        JS : double
             r,vを求めたい時刻(s)
         返り値--------------------------
         r_vec : 3*1 ndarray(double)
-            時刻tのrの値(km)
+            時刻JSのrの値(km)
         v_vec : 3*1 ndarray(double)
-            時刻tのvの値(km/s)
+            時刻JSのvの値(km/s)
         """
         omega_rad = np.radians(omega)
         Omega_rad = np.radians(Omega)
@@ -320,21 +395,21 @@ class TrajectoryCalculator():
         p = a * (1 - e**2)
         #楕円の場合
         if (a > 0):
-            E = self.solve_Kepler(a,e,t_p,t,100)
+            E = self.solve_Kepler(a,e,t_p,JS,100)
             E_rad = np.radians(E)
             r = a * (1 - e * np.cos(E_rad))
             r_vec = a * (np.cos(E_rad) - e) * P_hat_vec + (a * p)**0.5 * np.sin(E_rad) * Q_hat_vec
             v_vec = -(a * self.mu)**0.5 / r * np.sin(E_rad) * P_hat_vec + (self.mu * p)**0.5 / r * np.cos(E_rad) * Q_hat_vec
         #双曲線の場合（放物線は考えない）
         else:
-            H = self.solve_hyperbola_eq(a,e,t_p,t,100)
+            H = self.solve_hyperbola_eq(a,e,t_p,JS,100)
             H_rad = np.radians(H)
             r = a * (1 - e * np.cosh(H_rad))
             r_vec = a * (np.cosh(H_rad) - e) * P_hat_vec + (- a * p)**0.5 * np.sinh(H_rad) * Q_hat_vec
             v_vec = -(-a * self.mu)**0.5 / r * np.sinh(H_rad) * P_hat_vec + (self.mu * p)**0.5 / r * np.cosh(H_rad) * Q_hat_vec
         return r_vec, v_vec
     
-    def calc_orbital_elems_from_r_v(self, r_vec ,v_vec, t,
+    def calc_orbital_elems_from_r_v(self, r_vec ,v_vec, JS,
                                 i_hat_vec = np.array([[1],[0],[0]]), j_hat_vec= np.array([[0],[1],[0]]), k_hat_vec= np.array([[0],[0],[1]])):
         """
         ある時刻のr,vから軌道要素を求める
@@ -343,7 +418,7 @@ class TrajectoryCalculator():
             rの値(km)
         v_vec : 3*1 ndarray(double)
             vの値(km/s)
-        t : double
+        JS : double
             時刻(s)
         i_hat_vec : 3*1 ndarray(double)
             赤道面の春分点方向基準ベクトル
@@ -363,7 +438,7 @@ class TrajectoryCalculator():
         Omega : double
             昇交点離角(deg)
         t_p : double
-            近地点通過時刻(s)
+            近地点通過時刻(JS,s)
         P_hat_vec : ndarraty
             基準ベクトル
         W_hat_vec : ndarraty
@@ -389,10 +464,10 @@ class TrajectoryCalculator():
             omega = 360 - omega
         if (a > 0): #楕円の場合
             E_rad  = np.arctan2(np.dot(r_vec.T, v_vec) / (self.mu * a)**0.5, (1 - r / a))
-            t_p = t - (a**3 / self.mu)**0.5 * (E_rad - e * np.sin(E_rad))
+            t_p = JS - (a**3 / self.mu)**0.5 * (E_rad - e * np.sin(E_rad))
         else: #双曲線の場合
             H_rad  = np.arcsinh(np.dot(r_vec.T, v_vec) / (self.mu * -a)**0.5 / e)
-            t_p = t - (-a**3 / self.mu)**0.5 * (e * np.sin(H_rad) - H_rad)
+            t_p = JS - (-a**3 / self.mu)**0.5 * (e * np.sin(H_rad) - H_rad)
         return float(a),float(e),float(i),float(omega),float(Omega),float(t_p),P_hat_vec, Q_hat_vec,W_hat_vec
 
     def eci2ecef(self, r, theta):
@@ -433,6 +508,59 @@ class TrajectoryCalculator():
 
         return longitude, latitude
     
+    def plot_trajectory(self, r_vec, v_vec, JS, nu_start, nu_end, ax, col = 'k'):
+        """
+        plot trajectory from nu_start to nu_end
+        input---------------------
+        r_vec : 3*1 ndarray(double)
+            position at JS
+        v_vec : 3*1 ndarray(double)
+            velocity at JS
+        JS : double
+            arbitorary time
+        nu_start : double
+            true anomaly at start time
+        nu_send : double
+            true anomaly at end time
+        ax : Axes
+            axes of subplot of plt.figure
+        """
+        if(nu_start > nu_end):
+            nu_end += 360
+        a,e,i,omega,Omega,t_p,P_hat_vec, Q_hat_vec, W_hat_vec = self.calc_orbital_elems_from_r_v(r_vec,v_vec,JS)
+        p = a * (1 - e**2)
+        nu_start_rad = np.deg2rad(nu_start)
+        nu_end_rad = np.deg2rad(nu_end)
+        nu = np.arange(nu_start_rad, nu_end_rad,.01)
+        r = p / (1 + e * np.cos(nu))
+        x = r*np.cos(nu)*P_hat_vec[0] + r*np.sin(nu)*Q_hat_vec[0]
+        y = r*np.cos(nu)*P_hat_vec[1] + r*np.sin(nu)*Q_hat_vec[1]
+        z = r*np.cos(nu)*P_hat_vec[2] + r*np.sin(nu)*Q_hat_vec[2]
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+        ax.set_zlabel("z")
+        ax.plot(x,y,z,color = col)
+        ax.view_init(elev=0, azim=70)
+
+    # def rotation_matrix_ijk2PQW(self, i, omega, Omega):
+    #     m1 = self.rotation_matrix_1axis(omega, 'z')
+    #     m2 = self.rotation_matrix_1axis(i, 'x')
+    #     m3 = self.rotation_matrix_1axis(Omega, 'z')
+    #     m12 = np.dot(m1,m2)
+    #     m123 = np.dot(m12,m3)
+    #     return m123
+    
+    # def rotation_matrix_1axis(self, angle, axis):
+    #     angle_rad = np.deg2rad(angle)
+    #     m_2d = np.array([[np.cos(angle_rad), np.sin(angle_rad)],[-np.sin(angle_rad), np.cos(angle_rad)]])
+    #     m_3d = np.eye(3)
+    #     if (axis == 'x'):
+    #         m_3d[0:2, 0:2] = m_2d
+    #     elif(axis == 'z'):
+    #         m_3d[1:3,1:3] = m_2d
+    #     return m_3d
+            
+
 class Planet():
     """
     惑星クラス、太陽周回軌道面や位置などの情報を与える
@@ -504,470 +632,3 @@ class Planet():
             x = np.append(x,r[0])
             y = np.append(y,r[1])
         plt.plot(x,y,"k")
-
-class LambertSolver():
-    """
-    ランベルト問題を解くための関数群を保持。軌道計算ごとにインスタンスを定義すること
-    """
-    def __init__(self, k_hat_vec = np.array([[0.],[0.],[1.]]),values = Values(), center_planet = 'Sun'):
-        self.mu = values.mu(center_planet)
-        self.k_hat_vec = k_hat_vec
-
-    def set_variables(self,r1_vec,r2_vec,t1,t2):
-        """
-        引数--------------------------
-        r1_vec : 3*1 ndarray
-            出発位置(km)
-        r2_vec : 3*1 ndarray
-            到着位置(km)
-        t1 : double
-            出発時刻(s)
-        t2 : double
-            到着時刻
-        """
-        self.r1_vec = r1_vec
-        self.r2_vec = r2_vec
-        self.r1 = np.linalg.norm(r1_vec)
-        self.r2 = np.linalg.norm(r2_vec)
-        self.t1 = t1
-        self.t2 = t2
-        self.delta_t = t2 - t1 #飛行時間
-        self.c = np.linalg.norm(r2_vec - r1_vec) #2点間距離
-        self.s = (self.r1 + self.r2 + self.c) / 2. 
-        self.a_m = self.s / 2. #楕円軌道での最小長半径。FとF*が同じ側か判断
-
-    def set_flag_delta_nu_is_under_180(self):
-        """
-        遷移角が180度以上か判断し、nu_is_under_180をセット
-        """
-        #delta_nuを求める
-        cos_delta_nu = np.dot(self.r1_vec.T, self.r2_vec) / self.r1 / self.r2
-        sin_delta_nu = (1 - cos_delta_nu**2.)**0.5
-        if (np.dot(np.cross(self.r1_vec.T,self.r2_vec.T), self.k_hat_vec) < 0): #r1からr2への向きが右回りなら符号を逆転
-            sin_delta_nu = - sin_delta_nu
-        self.delta_nu_rad = np.arctan2(sin_delta_nu, cos_delta_nu) #-180~180
-        if (self.delta_nu_rad < 0): #0~360の範囲に
-            self.delta_nu_rad = self.delta_nu_rad + np.pi * 2.
-        self.delta_nu_is_under_180 = (0 <= self.delta_nu_rad <= np.pi)
-    
-    def set_flag_is_ellipse(self, delta_nu_is_under_180):
-        """
-        軌道を判断（放物線は考えない）し、is_ellipseをセット
-        """
-        if (delta_nu_is_under_180):
-            delta_t_p = 1. / 3. * (2. / self.mu)**0.5 * (self.s**1.5 - (self.s - self.c)**1.5) #放物線軌道の遷移時間
-            self.is_ellipse = self.delta_t > delta_t_p
-        else:
-            delta_t_p = 1. / 3. * (2. / self.mu)**0.5 * (self.s**1.5 + (self.s - self.c)**1.5) #放物線軌道の遷移時間
-            self.is_ellipse = self.delta_t > delta_t_p
-
-    def set_flag_focus_is_same_side(self, delta_nu_is_under_180):
-        """
-        楕円軌道で焦点が同じ側にあるか判断し、focus_is_same_sideをセット
-        """
-        #delta_tを求める
-        beta_m_rad = 2 * np.arcsin(((self.s - self.c) / self.s)**0.5)
-        if (delta_nu_is_under_180):
-            delta_t_m = (self.a_m**3. / self.mu)**0.5 * (np.pi - (beta_m_rad - np.sin(beta_m_rad))) #最小楕円軌道の遷移時間
-            self.focus_is_same_side = self.delta_t < delta_t_m #双曲線では不要
-        else:
-            delta_t_m = (self.a_m**3. / self.mu)**0.5 * (np.pi + (beta_m_rad - np.sin(beta_m_rad))) #最小楕円軌道の遷移時間
-            self.focus_is_same_side = self.delta_t > delta_t_m #双曲線では不要
-    
-    def calc_delta_t(self, a):
-        """
-        長半径に対して飛行時間を返す関数
-        引数--------------------------
-        a : double
-            長半径(km)
-        返り値--------------------------
-        delta_t : double
-            飛行時間
-        """
-        #楕円の場合
-        if (self.is_ellipse): 
-            alpha_rad = 2. * np.arcsin((self.s / 2. / a)**0.5)
-            beta_rad = 2. * np.arcsin(((self.s - self.c)/ 2. / a)**0.5)
-            if (self.delta_nu_is_under_180):
-                if (self.focus_is_same_side):
-                    return (a**3. / self.mu)**0.5 * ((alpha_rad - np.sin(alpha_rad)) - (beta_rad - np.sin(beta_rad)))
-                else:
-                    return (a**3. / self.mu)**0.5 * (2 * np.pi - (alpha_rad - np.sin(alpha_rad)) - (beta_rad - np.sin(beta_rad)))
-            else:
-                if (self.focus_is_same_side):
-                    return (a**3. / self.mu)**0.5 * (2 * np.pi - (alpha_rad - np.sin(alpha_rad)) + (beta_rad - np.sin(beta_rad)))
-                else:
-                    return (a**3. / self.mu)**0.5 * ((alpha_rad - np.sin(alpha_rad)) + (beta_rad - np.sin(beta_rad)))
-        else: 
-            gamma_rad = 2. * np.arcsinh((self.s / 2 / a)**0.5)
-            delta_rad = 2. * np.arcsinh(((self.s - self.c)/ 2 / a)**0.5)
-            if (self.delta_nu_is_under_180):
-                return (a**3. / self.mu)**0.5 * ((np.sinh(gamma_rad) - gamma_rad) - (np.sinh(delta_rad) - delta_rad))
-            else:
-                return (a**3. / self.mu)**0.5 * ((np.sinh(gamma_rad) - gamma_rad) + (np.sinh(delta_rad) - delta_rad))
-            
-    def calc_d_da_delta_t(self, a):
-        """
-        飛行時間の長半径微分を返す関数
-        引数--------------------------
-        a : double
-            長半径(km)
-        返り値--------------------------
-        d_da_delta_t : double
-            飛行時間の長半径微分
-        """
-        T = 2. * np.pi * (a**3. / self.mu)**0.5
-        if (self.is_ellipse):
-            alpha_rad = 2. * np.arcsin((self.s / 2. / a)**0.5)
-            beta_rad = 2. * np.arcsin(((self.s - self.c)/ 2. / a)**0.5)
-            if (self.delta_nu_is_under_180):
-                if (self.focus_is_same_side):
-                    return 3. * self.delta_t / 2. / a - 1 / (self.mu * a**3)**0.5 * (self.s**2 / np.sin(alpha_rad) - (self.c - self.s)**2. / np.sin(beta_rad))
-                else:
-                    return 3. * T / 2. / a + 3. * self.delta_t / 2. / a + 1 / (self.mu * a**3)**0.5 * (self.s**2 / np.sin(alpha_rad) + (self.c - self.s)**2. / np.sin(beta_rad))
-            else:
-                if (self.focus_is_same_side):
-                    return 3. * T / 2. / a + 3. * self.delta_t / 2. / a + 1 / (self.mu * a**3)**0.5 * (self.s**2 / np.sin(alpha_rad) - (self.c - self.s)**2. / np.sin(beta_rad))
-                else:
-                    return 3. * self.delta_t / 2. / a - 1 / (self.mu * a**3)**0.5 * (self.s**2 / np.sin(alpha_rad) + (self.c - self.s)**2. / np.sin(beta_rad))
-                   
-        else:
-            gamma_rad = 2 * np.arcsinh((self.s / 2 / a)**0.5)
-            delta_rad = 2 * np.arcsinh(((self.s - self.c)/ 2 / a)**0.5)
-            if (self.delta_nu_is_under_180):
-                return 3. * self.delta_t / 2. / a - 1 / (self.mu * a**3)**0.5 * (self.s**2 / np.sinh(gamma_rad) - (self.c - self.s)**2. / np.sinh(delta_rad))
-            else:
-                return 3. * self.delta_t / 2. / a - 1 / (self.mu * a**3)**0.5 * (self.s**2 / np.sinh(gamma_rad) + (self.c - self.s)**2. / np.sinh(delta_rad))
-                                                                                                                                                
-    def calc_a(self):
-        """
-        ニュートンラフソン法によって飛行時間を満たす長軸半径を求める
-        返り値--------------------------
-        a : double
-            長半径(km)
-        """
-        a = 1.1 * self.a_m
-        n = 0
-        while(np.abs(self.calc_delta_t(a) - self.delta_t) > self.delta_t * 10**(-10)):
-            rho = 1.
-            while(a + rho*(self.delta_t - self.calc_delta_t(a)) / self.calc_d_da_delta_t(a) < self.a_m): #a_m以下にはならないことからステップをつける（あるみほ条件）
-                rho = 0.9*rho
-            a = a + rho * (self.delta_t - self.calc_delta_t(a)) / self.calc_d_da_delta_t(a)
-            n = n + 1
-            if(n > 1000):
-                print("can't calculate",self.t1,self.t2)
-                break
-        if (not self.is_ellipse):
-            a = -a
-        return a
-
-    def solve_lambert(self):
-        """
-        ランベルト問題を解く関数
-        """
-        #形状などを判断
-        self.set_flag_delta_nu_is_under_180()
-        self.set_flag_is_ellipse(self.delta_nu_is_under_180)
-        self.set_flag_focus_is_same_side(self.delta_nu_is_under_180)
-        #Δtを満たす長半径を求める
-        a = self.calc_a()
-        
-        #以下は後処理
-        #pを求める
-        if (self.is_ellipse):
-            alpha_rad = 2. * np.arcsin((self.s / 2. / a)**0.5)
-            beta_rad = 2. * np.arcsin(((self.s - self.c)/ 2. / a)**0.5)
-            if(self.focus_is_same_side):
-                p = 4 * a * (self.s - self.r1) * (self.s - self.r2) / self.c**2 * np.sin(alpha_rad / 2 + beta_rad / 2)**2
-            else:
-                p = 4 * a * (self.s - self.r1) * (self.s - self.r2) / self.c**2 * np.sin(alpha_rad / 2 - beta_rad / 2)**2
-        else:
-            gamma_rad = 2 * np.arcsinh((self.s / 2 / -a)**0.5)
-            delta_rad = 2 * np.arcsinh(((self.s - self.c)/ 2 / -a)**0.5)
-            if(self.delta_nu_is_under_180):
-                p = -4 * a * (self.s - self.r1) * (self.s - self.r2) / self.c**2 * np.sinh(gamma_rad / 2 + delta_rad / 2)**2
-            else:
-                p = -4 * a * (self.s - self.r1) * (self.s - self.r2) / self.c**2 * np.sinh(gamma_rad / 2 - delta_rad / 2)**2
-        #離心率
-        e = (1 - p / a)**0.5
-        #ν1,2を求める
-        cos_nu_1 = (p - self.r1) / 2 / self.r1
-        sin_nu_1 = 1 / np.sin(self.delta_nu_rad) * (cos_nu_1 * np.cos(self.delta_nu_rad) - (p - self.r2) / 2 / self.r2) #加法定理（arctanでnu_1を求めたい）
-        nu_1_rad = np.arctan2(sin_nu_1,cos_nu_1)
-        nu_2_rad = (nu_1_rad + self.delta_nu_rad)
-        #v1,v2を求める
-        g = self.r1 * self.r2 * np.sin(self.delta_nu_rad) / (self.mu * p)**0.5
-        f = 1 - self.r2 / p * (1 - np.cos(self.delta_nu_rad))
-        g_dot = 1 - self.r1 / p * (1 - np.cos(self.delta_nu_rad))
-        v1_vec = 1 / g * (self.r2_vec - f * self.r1_vec)
-        v2_vec = 1 / g * (g_dot * self.r2_vec - self.r1_vec)
-        return a, e, p, float(nu_1_rad), float(nu_2_rad),v1_vec,v2_vec
-    
-class PlanetsTransOrbit():
-    def __init__(self, planet_start, planet_end, calculator = TrajectoryCalculator, lambert = LambertSolver, values = Values):
-        self.planet_start = planet_start
-        self.planet_end = planet_end
-        self.calculator_start = TrajectoryCalculator(planet_start.planet_name)
-        self.calculator_end = TrajectoryCalculator(planet_end.planet_name)
-        self.calculator_sun = TrajectoryCalculator("Sun")
-        self.lambert = LambertSolver()
-        self.values = Values()
-    
-    def launch_window_period(self, JS):
-        JD = JS / 24 / 60 / 60
-        T_TDB = (JD - 2451545.0) / 36525.0
-        a_start = self.values.a(self.planet_start.planet_name, T_TDB)
-        a_end = self.values.a(self.planet_end.planet_name, T_TDB)
-        mu = self.values.mu('Sun')
-        n_start = (mu / a_start**3)**0.5
-        n_end = (mu / a_end**3)**0.5
-        period = 2 * np.pi / np.abs(n_start - n_end)
-        return period
-
-
-    def calc_nu_between_planets(self, JS):
-        """
-        calculate angle between planets at givem JS
-        input--------------------------
-        JS : double
-            time when angle is calculated
-        output--------------------------
-        nu : double
-            angle between planets (0 ~ 360 deg)
-        """
-        r_vec_start, _ = self.planet_start.position_JS(JS)
-        r_vec_end, _ = self.planet_end.position_JS(JS)
-        r_vec_start[2] = 0
-        r_vec_end[2] = 0
-        cos = np.dot(r_vec_start.T, r_vec_end) / np.linalg.norm(r_vec_start) / np.linalg.norm(r_vec_end)
-        nu_rad = np.arccos(cos)
-        nu_deg = np.rad2deg(nu_rad)
-        outer = np.cross(r_vec_start[:,0], r_vec_end[:,0])
-        if (outer[2] > 0):
-            return nu_deg
-        else:
-            return -nu_deg + 360
-        
-    def delta_nu(self, JS):
-        JD = JS / 24 / 60 / 60
-        T_TDB = (JD - 2451545.0) / 36525.0
-        a_start = self.values.a(self.planet_start.planet_name, T_TDB)
-        a_end = self.values.a(self.planet_end.planet_name, T_TDB)
-        mu = self.values.mu("Sun")
-        t_H = np.pi * ((a_start + a_end)**3 / 8 / mu)**0.5
-        n_end = (mu / a_end**3)**0.5
-        delta_nu_rad = np.pi - n_end * t_H
-        return np.rad2deg(delta_nu_rad)
-    
-    def calc_launch_window(self, year_first, month_first, date_first, threshold, num):
-        """
-        calculate launch windows by binory search
-        input--------------------------
-        year_first, month_start, date_start : int
-            start time of iteration to calculate launch window
-        threshold : double
-            threshold of iteration to calculate launch window
-        num : double
-            number of launch windows you need
-        output--------------------------
-        sol : num*1 ndarray(double)
-            num launch windows
-        """
-        JS_start, _, _ = self.values.convert_times_to_T_TDB(year_first, month_first, date_first, 0, 0, 0)
-        period = self.launch_window_period(JS_start)
-        JS_last = JS_start + period
-        JS_mid = (JS_last + JS_start) / 2
-
-        count = 0
-
-        nu_start = self.calc_nu_between_planets(JS_start)
-        delta_nu = self.delta_nu(JS_start)
-        nu_mid = self.calc_nu_between_planets(JS_mid)
-        sign_delta_nu = delta_nu / np.abs(delta_nu)
-
-        if (nu_start > delta_nu):
-            delta_nu += 360
-        if (nu_start > nu_mid):
-            nu_mid += 360
-
-        while(np.abs(nu_mid - delta_nu) > threshold):
-            if(sign_delta_nu * (nu_mid - delta_nu) > 0):
-                JS_start = JS_mid
-            else:
-                JS_last = JS_mid
-            
-            JS_mid = (JS_last + JS_start) / 2
-            nu_mid = self.calc_nu_between_planets(JS_mid)
-            if (nu_start > nu_mid):
-                nu_mid += 360
-            count += 1
-            if(count > 1000):
-                print("exceed max num of iteration")
-                break
-        JS_array = np.arange(JS_mid, JS_mid+num*period, period)
-        JD_array = JS_array / 24 / 60 / 60
-        sol = np.zeros((num,6))
-        for i in range(num):
-            sol[i] =  np.array([self.values.convert_JD_to_times(JD_array[i])])
-        return sol
-
-class Satellite():
-    def __init__(self, planet, calculator = TrajectoryCalculator):
-        self.planet = planet
-        self.calculator = calculator(planet.planet_name)
-
-    def init_orbit_by_orbital_elems(self, a, e, i, omega, Omega, t_p):
-        self.orbital_elems = np.array([a, e, i, omega, Omega, t_p])
-
-    def init_orbit_by_rv(self, r_vec ,v_vec, t0):
-        self.orbital_elems = np.array([self.calculator.calc_orbital_elems_from_r_v(self, r_vec ,v_vec, t0)])
-
-    def get_rv(self, t):
-        r, v = self.calculator.calc_r_v_from_orbital_elems(*self.orbital_elems, t)
-        return r, v
-
-class Occultation():
-    """
-    衛星間電波遮蔽計算用のクラス
-    """
-    def __init__(self, planet, satellites, calculator  = TrajectoryCalculator):
-        """ある時刻の惑星のr,vを求める
-        引数--------------------------
-            planet : Planet
-                中心惑星
-        """
-        self.planet = planet
-        self.sats = satellites
-        self.trajectory_calculator = calculator(planet.planet_name)
-        
-    
-    def get_position_observed(self, r1, r2):
-        """観測点を求める
-        引数--------------------------
-            r1,r2 : 3*1 ndarray(double)
-                2衛星のどちらかの位置ベクトル
-        返り値--------------------------
-        distance : double
-            中心惑星と直線の距離
-        r_h : 3*1 ndarray(double)
-            垂線の脚の座標
-        is_occultated : bool
-            遮蔽されているか
-        """
-        r_rel = r2 - r1
-        r_h = r1 - (np.dot(r1.T, r_rel) / np.linalg.norm(r_rel)**2 * r_rel)
-        distance = np.linalg.norm(r_h)
-        
-        if (distance < self.planet.radius and np.dot((r1 - r_h).T,r2 - r_h) < 0):
-            is_occultated = True
-        else:
-            is_occultated = False
-
-        return distance, r_h, is_occultated
-
-    def geodetic_position_observed(self, r_h, theta):
-        """垂線の足の座標から電波遮蔽の観測点の緯度・経度を求める
-        引数--------------------------
-        r_h : 3*1 ndarray(double)
-            垂線の脚の座標
-        theta : double
-            グリニッジ恒星時(deg)
-        返り値--------------------------
-        longitude : double
-            観測点の経度
-        latitude : double
-            観測点の緯度
-        """
-        r_observed = r_h * self.planet.radius / np.linalg.norm(r_h)
-        r_ecef = self.trajectory_calculator.eci2ecef(r_observed, theta)
-        longitude, latitude = self.trajectory_calculator.calc_geodetic_position(r_ecef)
-        return longitude, latitude
-
-    def get_position_observed_mult(self, sats, t):
-        """観測点を求める
-        引数--------------------------
-        sats : list(Satellite)
-            衛星たち
-        t : double
-            時刻
-        返り値--------------------------
-        r_h_list : n*n*3 ndarray(double)
-            垂線の脚の座標のリスト
-        is_occultated_list : n*n list(bool)
-            遮蔽されているかのリスト
-        """
-        n = len(sats)
-        is_occultated_list = np.full((n,n),False)
-        r_h_list = np.zeros((n,n,3))
-        for i in range(n):
-            for j in range(n):
-                if (i == j):
-                    break
-                ri, _ = sats[i].get_rv(t)
-                rj, _ = sats[j].get_rv(t)
-                _, r_h, is_occultated = self.get_position_observed(ri, rj)
-                r_h_list[i][j] = r_h.T
-                is_occultated_list[i][j] = is_occultated
-        return r_h_list, is_occultated_list
-
-    def simulate_position_observed(self, theta0, t0, t_end, dt):
-        """シミュレーションにより観測点を求める
-        引数--------------------------
-        theta0 :double
-            t0でのグリニッジ恒星時(deg)
-        t0 : double
-            初期時刻
-        t_end : double
-            シミュレーション終了時刻
-        dt : double
-            シミュレーションステップ幅
-        返り値--------------------------
-        latitude_list : ndarray(double)
-            観測点のlatitude
-        longitude_list : ndarray(double)
-            観測点のlongitude
-        """
-        n_step = int((t_end - t0) / dt)
-        n = len(self.sats)
-
-        is_occultated_list = np.full((n,n),False)
-        prev_is_occultated_list = np.full((n,n),False)
-        is_first_list =  np.full((n,n),True)
-        mask_tri = np.tril(np.full((n,n),True), k = -1) # 上半分と下半分でsat1→sat2とsat2→sat1が重複するため、片方だけ取ってくる
-        r_h_list = np.zeros((n,n,3))
-        latitude_list = np.array([])
-        longitude_list = np.array([])
-        count = 0
-
-        t = t0
-        theta = theta0
-        for i in range(n_step):
-            r_h_list, is_occultated_list = self.get_position_observed_mult(self.sats, t)
-
-            # 掩蔽開始時
-            mask1 = is_occultated_list & is_first_list & mask_tri
-            r_h_true_list1 = r_h_list[mask1]
-            for j in range(len(r_h_true_list1)):
-                count += 1
-                longitude, latitude =  self.geodetic_position_observed(r_h_true_list1[j], theta)
-                latitude_list = np.append(latitude_list, latitude)
-                longitude_list = np.append(longitude_list, longitude)
-
-            # 掩蔽終了時
-            mask2 = ~is_occultated_list & prev_is_occultated_list & mask_tri
-            r_h_true_list2 = r_h_list[mask2]
-            for j in range(len(r_h_true_list2)):
-                count += 1
-                longitude, latitude =  self.geodetic_position_observed(r_h_true_list2[j], theta)
-                latitude_list = np.append(latitude_list, latitude)
-                longitude_list = np.append(longitude_list, longitude)
-
-            prev_is_occultated_list[is_occultated_list] = True
-            prev_is_occultated_list[~is_occultated_list] = False
-            is_first_list[is_occultated_list] = False
-            is_first_list[~is_occultated_list] = True
-            
-            t += dt
-            theta += dt * self.planet.rotation_omega
-
-        return longitude_list, latitude_list, count

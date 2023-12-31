@@ -23,5 +23,23 @@ if __name__ == '__main__':
     venus_calculator = TrajectoryCalculator("Venus")
 
     earth_mars = PlanetsTransOrbit(earth, mars)
-    res, t_H = earth_mars.calc_launch_window(2024, 4, 1, 0.001, 10)
-    print(res)
+    a = mars.radius + 2124
+    e = 0.2231
+    i = 80
+    omega = 50
+    Omega = 0
+    tp= 0 #invalid
+    oe_observation = (a, e, i, omega, Omega, tp)
+
+    theta = 30
+    r_h = mars.radius * 6
+
+    windows , t_H = earth_mars.calc_launch_window(2024, 4, 1, 0.001, 1)
+    JS_launch, _, _ = myval.convert_times_to_T_TDB(2024, 4, 1, 0, 0, 0)
+    duration = t_H
+
+    _,_,_,_,v_planet_start,v_planet_end,v_sat_start,v_sat_end = earth_mars.trajectory_by_lambert(windows[0], duration)
+    v_inf_vec = v_sat_end - v_planet_end
+
+    JS = JS_launch + duration
+    earth_mars.trajectory_insertion(theta, r_h, v_inf_vec, JS, 5*r_h, oe_observation)
