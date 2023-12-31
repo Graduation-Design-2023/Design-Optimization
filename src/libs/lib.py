@@ -207,16 +207,30 @@ class TrajectoryCalculator():
         nu_rad = np.arctan2(r_Q, r_P)
         nu = np.rad2deg(nu_rad)
         return nu
+    
+    def calc_period(self, a):
+        if(a > 0):
+            n_rad = (self.mu / a**3)**0.5
+        else:
+            n_rad = (-self.mu / a**3)**0.5
+        return 2 * np.pi / n_rad
 
     def calc_time_from_r_vec(self, r_vec, P_hat_vec, Q_hat_vec, a, e, t_p):
         r = np.linalg.norm(r_vec)
         nu = self.calc_nu_from_r_vec(r_vec, P_hat_vec, Q_hat_vec)
         nu_rad = np.deg2rad(nu)
-        cosE = r * np.cos(nu_rad) / a + e
-        sinE = r * np.sin(nu_rad) / (a * (1 - e**2))
-        E_rad = np.arctan2(sinE, cosE)
-        n_rad = (self.mu / a**3)
-        delta_t = (E_rad - e * sinE) / n_rad
+        if (a > 0):
+            cosE = r * np.cos(nu_rad) / a + e
+            sinE = r * np.sin(nu_rad) / (a * (1 - e**2)**0.5)
+            E_rad = np.arctan2(sinE, cosE)
+            n_rad = (self.mu / a**3)**0.5
+            delta_t = (E_rad - e * sinE) / n_rad
+        else:
+            coshH = (-r / a + 1) / e
+            sinhH = np.sin(nu_rad) * (e * coshH - 1)
+            H_rad = np.arcsinh(sinhH)
+            n_rad = (-self.mu / a**3)**0.5
+            delta_t = (e * sinhH - H_rad) / n_rad
         t = delta_t + t_p
         return t
 
@@ -266,11 +280,11 @@ class TrajectoryCalculator():
             時刻tのHの値(deg)
         """
         H_pre_rad = np.radians(H0)
-        H_rad = H_pre_rad - (e * np.sinh(H_pre_rad) - H_pre_rad - (self.mu / -a**3)**0.5 *(t - t_p)) / (e * np.cosh(H_pre_rad) - 1)
-        while(np.abs(H_pre_rad - H_pre_rad) >= self.threshold):
-            H_pre_rad = H_pre_rad
-            H_pre_rad = H_pre_rad - (e * np.sinh(H_pre_rad) - H_pre_rad - (self.mu / -a**3)**0.5 *(t - t_p)) / (e * np.cosh(H_pre_rad) - 1)
-        return np.degrees(H_rad)
+        H_rad = H_pre_rad - (e * np.sinh(H_pre_rad) - H_pre_rad - (self.mu / -a**3)**0.5 * (t - t_p)) / (e * np.cosh(H_pre_rad) - 1)
+        while(np.abs(H_pre_rad - H_rad) >= self.threshold):
+            H_pre_rad = H_rad
+            H_rad = H_pre_rad - (e * np.sinh(H_pre_rad) - H_pre_rad - (self.mu / -a**3)**0.5 *(t - t_p)) / (e * np.cosh(H_pre_rad) - 1)
+        return np.rad2deg(H_rad)
     
     def calc_PQW_from_orbital_elems(self,a,e,i,omega,Omega,t_p):
         """
@@ -500,6 +514,25 @@ class TrajectoryCalculator():
         ax.set_zlabel("z")
         ax.plot(x,y,z,color = col)
         ax.view_init(elev=0, azim=70)
+
+    def rotation_matrix_ijk2PQW(self, i, omega, Omega):
+        m1 = self.rotation_matrix_1axis(omega, 'z')
+        m2 = self.rotation_matrix_1axis(i, 'x')
+        m3 = self.rotation_matrix_1axis(Omega, 'z')
+        m12 = np.dot(m1,m2)
+        m123 = np.dot(m12,m3)
+        return m123
+    
+    def rotation_matrix_1axis(self, angle, axis):
+        angle_rad = np.deg2rad(angle)
+        m_2d = np.array([[np.cos(angle_rad), np.sin(angle_rad)],[-np.sin(angle_rad), np.cos(angle_rad)]])
+        m_3d = np.eye(3)
+        if (axis == 'x'):
+            m_3d[0:2, 0:2] = m_2d
+        elif(axis == 'z'):
+            m_3d[1:3,1:3] = m_2d
+        return m_3d
+            
 
 class Planet():
     """

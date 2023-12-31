@@ -28,12 +28,11 @@ if __name__ == '__main__':
     i = 80
     omega = 50
     Omega = 0
-    tp= 0
+    tp= 0 #invalid
     oe_observation = (a, e, i, omega, Omega, tp)
 
     theta = 45
-    r_h = mars.radius * 1.1
-    duration_insertion = 1.5 * 60 * 60
+    r_h = mars.radius * 3
 
     windows , t_H = earth_mars.calc_launch_window(2024, 4, 1, 0.001, 1)
     JS_launch, _, _ = myval.convert_times_to_T_TDB(2024, 4, 1, 0, 0, 0)
@@ -43,4 +42,4 @@ if __name__ == '__main__':
     v_inf_vec = v_sat_end - v_planet_end
 
     JS = JS_launch + duration
-    earth_mars.trajectory_insertion(theta, r_h, v_inf_vec, JS, r_h*1.2, oe_observation, duration_insertion)
+    earth_mars.trajectory_insertion(theta, r_h, v_inf_vec, JS, r_h*1.2, oe_observation)
