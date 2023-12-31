@@ -458,7 +458,7 @@ class PlanetsTransOrbit():
         v_inf_start = v_sat_start - v_planet_start
         return r_start, v_sat_start, v_planet_start,r_tcm, v_sat_before_tcm, v_sat_after_tcm, r_end, v_sat_end, v_planet_end
     
-    def trajectory_insertion1(self,theta,r_h,v_in_vec,JS,r_a_planetary,oe_observation):
+    def trajectory_insertion01(self,theta,r_h,v_in_vec,JS,r_a_planetary,oe_observation):
         """
         use coapsidal capture orbit for insertion into planetary orbit(1)
         input-------------------
@@ -542,7 +542,7 @@ class PlanetsTransOrbit():
 
         return r_n_vec, v_n_vec
         
-    def trajectory_insertion2(self, oe_observation, r_12_vec, v1_end_vec, JS_p1, duration):
+    def trajectory_insertion12(self, oe_observation, r_12_vec, v1_end_vec, JS_p1, duration):
         """
         trajectory insertion2
         input--------------------
@@ -583,7 +583,7 @@ class PlanetsTransOrbit():
         delta_v_vec = v2_start_vec - v1_end_vec
         return delta_v_vec, r_23_vec, v2_start_vec, v2_end_vec, nu2_start, nu2_end
 
-    def trajectory_insertion3(self, oe_observation, r_23_vec, v2_end_vec, JS2_end):
+    def trajectory_insertion23(self, oe_observation, r_23_vec, v2_end_vec, JS2_end):
         """
             trajectory insertion3
             input--------------------
@@ -603,11 +603,11 @@ class PlanetsTransOrbit():
         return delta_v_vec, r3_vec, v3_start_vec, nu3_start
 
     def trajectory_insertion(self, theta, r_h, v_in_vec, JS, r_a_planetary, oe_observation, duration):
-        delta_v_vec01, r_01_vec, r_12_vec, v0_end_vec, v1_start_vec, v1_end_vec, nu1_start, nu1_end = self.trajectory_insertion1(theta, r_h, v_in_vec, JS, r_a_planetary, oe_observation)
+        delta_v_vec01, r_01_vec, r_12_vec, v0_end_vec, v1_start_vec, v1_end_vec, nu1_start, nu1_end = self.trajectory_insertion01(theta, r_h, v_in_vec, JS, r_a_planetary, oe_observation)
         JS1_end = JS # fix me
-        delta_v_vec12, r_23_vec, v2_start_vec, v2_end_vec, nu2_start, nu2_end = self.trajectory_insertion2(oe_observation, r_01_vec, v1_end_vec, JS1_end, duration)
+        delta_v_vec12, r_23_vec, v2_start_vec, v2_end_vec, nu2_start, nu2_end = self.trajectory_insertion12(oe_observation, r_01_vec, v1_end_vec, JS1_end, duration)
         JS2_end = JS1_end + duration
-        delta_v_vec23, r3_vec, v3_start_vec, nu3_start = self.trajectory_insertion3(oe_observation, r_23_vec, v2_end_vec, JS2_end)
+        delta_v_vec23, r3_vec, v3_start_vec, nu3_start = self.trajectory_insertion23(oe_observation, r_23_vec, v2_end_vec, JS2_end)
 
         fig = plt.figure()
         ax = fig.add_subplot(111,projection = '3d')
