@@ -192,6 +192,17 @@ class TrajectoryCalculator():
         self.mu = self.values.mu(center_planet_name)
 
     def calc_rv_from_nu(self, nu, a, e, P_hat_vec, Q_hat_vec):
+        """
+        calc position and velocity from true anomaly
+        nu : double
+            true anomaly
+        a : double
+            semi major axis
+        e : double
+            eccentricity
+        P_hat_vec : 3*1 ndarray(double)
+        Q_hat_vec : 3*1 ndarray(double)
+        """
         nu_rad = np.deg2rad(nu)
         p = a * (1 - e**2)
         v_vec = (self.mu / p)**0.5 * (- np.sin(nu_rad) * P_hat_vec + (e + np.cos(nu_rad) * Q_hat_vec))
@@ -498,6 +509,22 @@ class TrajectoryCalculator():
         return longitude, latitude
     
     def plot_trajectory(self, r_vec, v_vec, JS, nu_start, nu_end, ax, col = 'k'):
+        """
+        plot trajectory from nu_start to nu_end
+        input---------------------
+        r_vec : 3*1 ndarray(double)
+            position at JS
+        v_vec : 3*1 ndarray(double)
+            velocity at JS
+        JS : double
+            arbitorary time
+        nu_start : double
+            true anomaly at start time
+        nu_send : double
+            true anomaly at end time
+        ax : Axes
+            axes of subplot of plt.figure
+        """
         if(nu_start > nu_end):
             nu_end += 360
         a,e,i,omega,Omega,t_p,P_hat_vec, Q_hat_vec, W_hat_vec = self.calc_orbital_elems_from_r_v(r_vec,v_vec,JS)
@@ -515,23 +542,23 @@ class TrajectoryCalculator():
         ax.plot(x,y,z,color = col)
         ax.view_init(elev=0, azim=70)
 
-    def rotation_matrix_ijk2PQW(self, i, omega, Omega):
-        m1 = self.rotation_matrix_1axis(omega, 'z')
-        m2 = self.rotation_matrix_1axis(i, 'x')
-        m3 = self.rotation_matrix_1axis(Omega, 'z')
-        m12 = np.dot(m1,m2)
-        m123 = np.dot(m12,m3)
-        return m123
+    # def rotation_matrix_ijk2PQW(self, i, omega, Omega):
+    #     m1 = self.rotation_matrix_1axis(omega, 'z')
+    #     m2 = self.rotation_matrix_1axis(i, 'x')
+    #     m3 = self.rotation_matrix_1axis(Omega, 'z')
+    #     m12 = np.dot(m1,m2)
+    #     m123 = np.dot(m12,m3)
+    #     return m123
     
-    def rotation_matrix_1axis(self, angle, axis):
-        angle_rad = np.deg2rad(angle)
-        m_2d = np.array([[np.cos(angle_rad), np.sin(angle_rad)],[-np.sin(angle_rad), np.cos(angle_rad)]])
-        m_3d = np.eye(3)
-        if (axis == 'x'):
-            m_3d[0:2, 0:2] = m_2d
-        elif(axis == 'z'):
-            m_3d[1:3,1:3] = m_2d
-        return m_3d
+    # def rotation_matrix_1axis(self, angle, axis):
+    #     angle_rad = np.deg2rad(angle)
+    #     m_2d = np.array([[np.cos(angle_rad), np.sin(angle_rad)],[-np.sin(angle_rad), np.cos(angle_rad)]])
+    #     m_3d = np.eye(3)
+    #     if (axis == 'x'):
+    #         m_3d[0:2, 0:2] = m_2d
+    #     elif(axis == 'z'):
+    #         m_3d[1:3,1:3] = m_2d
+    #     return m_3d
             
 
 class Planet():

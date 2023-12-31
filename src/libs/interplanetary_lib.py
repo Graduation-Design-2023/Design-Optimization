@@ -443,6 +443,16 @@ class PlanetsTransOrbit():
             time at the tcm(y,m,d,h,m,s)
         v_inf_end : 3*1 ndarray(double)
             velocity when a sat reached the target planet(taget planet centered)
+        output-------------------------
+        r_start
+        v_sat_start
+        v_planet_start
+        r_tcm
+        v_sat_before_tcm
+        v_sat_aftert_tcm
+        r_end
+        v_sat_end
+        v_planet_end
         """
         JS_start, _, _ = self.values.convert_times_to_T_TDB(self, *time_start)
         JS_end, _, _ = self.values.convert_times_to_T_TDB(self, *time_end)
@@ -472,6 +482,16 @@ class PlanetsTransOrbit():
             time entering target planet gravity field   
         r_a_planetary : double
             apogee distance for coapsidal capture orbit
+        output-------------------
+        r_01_vec
+        r_12_vec
+        v0_end_vec
+        v1_start_vec
+        v1_end_vec
+        0(nu1_start)
+        nu1_end 
+        JS0_end 
+        JS1_end
         """
         # values of trans trajectory"
         theta_rad = np.deg2rad(theta)
@@ -505,6 +525,9 @@ class PlanetsTransOrbit():
             velocity at perigee  of planetary orbit
         JS_p1 : double
             time at perigee  of planetary orbit
+        output---------------------
+        r_n_vec
+        v_n_vec
         """
         a1, e1, i1, _, Omega1, _, P_hat1_vec, Q_hat1_vec, W_hat1_vec = self.calculator_end.calc_orbital_elems_from_r_v(r_01_vec, v1_start_vec, JS0_end)
         p1 = a1 * (1 - e1**2)
@@ -540,6 +563,23 @@ class PlanetsTransOrbit():
         return r_n_vec, v_n_vec
     
     def trajectory_insertion12(self, oe_observation, r_12_vec, JS1_end):
+        """
+        trajectory insertion12
+        input--------------------
+        oe_observation : 6 tuple
+            orbital elements of observation orbit
+        r_12_vec : 3*1 ndarray
+            position at maneuver time of insertion12
+        JS1_end : double
+            maneuver time of insertion12
+        output------------------
+        r_23_vec
+        v2_start_vec
+        v2_end_ve
+        nu2_start
+        0(nu2_end)
+        JS2_end
+        """
         # calc  values of observation orbit
         a3, e3, i3, omega3, Omega3, _ = oe_observation
         P_hat3_vec, Q_hat3_vec, W_hat3_vec = self.calculator_end.calc_PQW_from_orbital_elems(*oe_observation)
@@ -600,6 +640,13 @@ class PlanetsTransOrbit():
             time at perigee  of planetary orbit
         duration : double
             time for insertion2(s)
+        output--------------------
+        delta_v_vec
+        r_23_vec
+        v2_start_vec
+        v2_end_vec
+        nu2_start
+        nu2_end
         """
 
         a1, e1, i1, omega1, Omega1, t_p1, P_hat1_vec, Q_hat1_vec, _ = self.calculator_end.calc_orbital_elems_from_r_v(r_12_vec, v1_end_vec, JS_p1)
@@ -629,16 +676,19 @@ class PlanetsTransOrbit():
 
     def trajectory_insertion23(self, oe_observation, r_23_vec, v2_end_vec, JS2_end):
         """
-            trajectory insertion3
-            input--------------------
-            oe_observation : 6 tuple
-                orbital elements of observation orbit
-            r2_end_vec : 3*1 ndarray
-                position at the end of insertion2
-            v2_end_vec vec
-                velocity at the end of insertion2
-            JS : double
-                time at the end of insertion2
+        trajectory insertion3
+        input--------------------
+        oe_observation : 6 tuple
+            orbital elements of observation orbit
+        r2_end_vec : 3*1 ndarray
+            position at the end of insertion2
+        v2_end_vec vec
+            velocity at the end of insertion2
+        JS : double
+            time at the end of insertion2
+        output-------------------
+        v3_start_vec
+        nu3_start
         """
         # calc t_p
         a3, e3, i3, omega3, Omega3, _ = oe_observation
