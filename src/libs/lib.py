@@ -194,12 +194,16 @@ class TrajectoryCalculator():
     def calc_rv_from_nu(self, nu, a, e, P_hat_vec, Q_hat_vec):
         nu_rad = np.deg2rad(nu)
         p = a * (1 - e**2)
-        v_vec = (self.mu / p)**0.5(- np.sin(nu_rad) * P_hat_vec + (e + np.cos(nu_rad) * Q_hat_vec))
+        v_vec = (self.mu / p)**0.5 * (- np.sin(nu_rad) * P_hat_vec + (e + np.cos(nu_rad) * Q_hat_vec))
         return v_vec
 
-    def calc_nu_from_r_vec(self, r_vec, P_hat_vec, Q_hat_vec):
+    def calc_nu_from_r_vec(self, r_vec, P_hat_vec, Q_hat_vec, check_threshold=0.001):
         r_P = np.dot(r_vec.T, P_hat_vec)
         r_Q = np.dot(r_vec.T, Q_hat_vec)
+        W_hat_vec = np.cross(P_hat_vec.T, Q_hat_vec.T)
+        if (np.abs(np.dot(W_hat_vec, r_vec)) > check_threshold ):
+            print("plane is invalid")
+            print(np.dot(W_hat_vec, r_vec))
         nu_rad = np.arctan2(r_Q, r_P)
         nu = np.rad2deg(nu_rad)
         return nu
@@ -479,10 +483,10 @@ class TrajectoryCalculator():
 
         return longitude, latitude
     
-    def plot_trajectory(self, r_vec, v_vec, JS, nu_start, nu_end):
+    def plot_trajectory(self, r_vec, v_vec, JS, nu_start, nu_end, ax, col = 'k'):
         if(nu_start > nu_end):
-            nu_end = nu_end + 360
-        a,e,i,omega,Omega,t_p,P_hat_vec, Q_hat_vec, W_hat_vec = self.calc_6elements_from_r_v(r_vec,v_vec,JS)
+            nu_end += 360
+        a,e,i,omega,Omega,t_p,P_hat_vec, Q_hat_vec, W_hat_vec = self.calc_orbital_elems_from_r_v(r_vec,v_vec,JS)
         p = a * (1 - e**2)
         nu_start_rad = np.deg2rad(nu_start)
         nu_end_rad = np.deg2rad(nu_end)
@@ -491,14 +495,12 @@ class TrajectoryCalculator():
         x = r*np.cos(nu)*P_hat_vec[0] + r*np.sin(nu)*Q_hat_vec[0]
         y = r*np.cos(nu)*P_hat_vec[1] + r*np.sin(nu)*Q_hat_vec[1]
         z = r*np.cos(nu)*P_hat_vec[2] + r*np.sin(nu)*Q_hat_vec[2]
-        fig = plt.figure()
-        ax = fig.add_subplot(111,projection = '3d')
         ax.set_xlabel("x")
         ax.set_ylabel("y")
         ax.set_zlabel("z")
-        ax.plot(x,y,z,color = "k")
+        ax.plot(x,y,z,color = col)
         ax.view_init(elev=0, azim=70)
-    
+
 class Planet():
     """
     惑星クラス、太陽周回軌道面や位置などの情報を与える
