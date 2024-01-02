@@ -562,7 +562,7 @@ class PlanetsTransOrbit():
 
         return r_n_vec, v_n_vec
     
-    def trajectory_insertion12(self, oe_observation, r_12_vec, JS1_end):
+    def trajectory_insertion12(self, oe_observation, r_12_vec, JS1_end, target_is_perigee):
         """
         trajectory insertion12
         input--------------------
@@ -572,6 +572,7 @@ class PlanetsTransOrbit():
             position at maneuver time of insertion12
         JS1_end : double
             maneuver time of insertion12
+        target_is_perigee : bool
         output------------------
         r_23_vec
         v2_start_vec
@@ -589,12 +590,6 @@ class PlanetsTransOrbit():
 
         # calc  values concerning r_N
         r_12 = np.linalg.norm(r_12_vec)
-        # ijk2PQW3 = self.calculator_end.rotation_matrix_ijk2PQW(i3, omega3, Omega3)
-        # r_12_PQW3_vec = np.dot(ijk2PQW3, r_12_vec)
-        # x = r_12_PQW3_vec[0]
-        # y = r_12_PQW3_vec[1]
-        # z = r_12_PQW3_vec[2]
-        # print(x,y,z)
         x = np.dot(r_12_vec.T, P_hat3_vec)
         y = np.dot(r_12_vec.T, Q_hat3_vec)
         z = np.dot(r_12_vec.T, W_hat3_vec)
@@ -602,18 +597,33 @@ class PlanetsTransOrbit():
         nu2_start = np.rad2deg(nu2_start_rad)
         cos_nu = np.cos(nu2_start_rad)
         
-        if (0 < cos_nu < x / r_p3 or x / r_p3 < cos_nu < 0):
-            self.target_is_perigee = True
-            r_23 = r_p3
-            v_2_end = (x * (1 - cos_nu) / (r_p3 * cos_nu / mu * (r_p3 - x)))**0.5
-            r_23_vec =  r_23 * P_hat3_vec
-            v2_end_vec = v_2_end * Q_hat3_vec
+        # value when perigee of orbit3 is used
+        r_23_p = r_p3
+        v_2_end_p = (x * (1 - cos_nu) / (r_p3 * cos_nu / mu * (r_p3 - x)))**0.5
+        r_23_vec_p =  r_23_p * P_hat3_vec
+        v2_end_vec_p = v_2_end_p * Q_hat3_vec
+        # value when apogee of orbit3 is used
+        r_23_a = r_a3
+        v_2_end_a = (x * (1 + cos_nu) / (r_a3 * cos_nu / mu * (r_a3 + x)))**0.5
+        r_23_vec_a = - r_23_a * P_hat3_vec
+        v2_end_vec_a = - v_2_end_a * Q_hat3_vec
+
+        if(target_is_perigee):
+            r_23_vec = r_23_vec_p
+            v2_end_vec = v2_end_vec_p
+            if (r_23_p * v_2_end_p**2 / mu > 1):
+                nu2_end = 0
+            else:
+                nu2_end = 180
+                nu2_start += 180
         else:
-            self.target_is_perigee = False
-            r_23 = r_a3
-            v_2_end = (x * (1 - cos_nu) / (r_a3 * cos_nu / mu * (r_a3 - x)))**0.5
-            r_23_vec = - r_23 * P_hat3_vec
-            v2_end_vec = - v_2_end * Q_hat3_vec
+            r_23_vec = r_23_vec_a
+            v2_end_vec = v2_end_vec_a
+            if (r_23_a * v_2_end_a**2 / mu > 1):
+                nu2_end = 0
+                nu2_start += 180
+            else:
+                nu2_end = 180
         
         # determine orbit2    
         a2, e2, i2, omega2, Omega2, _, P_hat2_vec, Q_hat2_vec, _ = self.calculator_end.calc_orbital_elems_from_r_v(r_23_vec, v2_end_vec, 0) # tp is invalid because JS is wrong value
@@ -623,7 +633,7 @@ class PlanetsTransOrbit():
         debug, v2_start_vec = self.calculator_end.calc_r_v_from_orbital_elems(a2,e2,i2,omega2,Omega2,t_p2,JS1_end)
         JS2_end = t_p2 + period2
     
-        return r_23_vec, v2_start_vec, v2_end_vec, nu2_start, 0, JS2_end
+        return r_23_vec, v2_start_vec, v2_end_vec, nu2_start, nu2_end, JS2_end
         
 
     def trajectory_insertion12_old(self, oe_observation, r_12_vec, v1_end_vec, JS_p1, duration):
@@ -674,7 +684,7 @@ class PlanetsTransOrbit():
         delta_v_vec = v2_start_vec - v1_end_vec
         return delta_v_vec, r_23_vec, v2_start_vec, v2_end_vec, nu2_start, nu2_end
 
-    def trajectory_insertion23(self, oe_observation, r_23_vec, v2_end_vec, JS2_end):
+    def trajectory_insertion23(self, oe_observation, r_23_vec, v2_end_vec, JS2_end,target_is_perigee):
         """
         trajectory insertion3
         input--------------------
@@ -686,6 +696,7 @@ class PlanetsTransOrbit():
             velocity at the end of insertion2
         JS : double
             time at the end of insertion2
+        target_is_perigee : bool
         output-------------------
         v3_start_vec
         nu3_start
@@ -693,7 +704,7 @@ class PlanetsTransOrbit():
         # calc t_p
         a3, e3, i3, omega3, Omega3, _ = oe_observation
         n_rad = (self.planet_end.mu / a3**3)**0.5
-        if(self.target_is_perigee):
+        if(target_is_perigee):
             t_p3 = JS2_end
         else:
             t_p3 = JS2_end + np.pi / n_rad
@@ -703,16 +714,25 @@ class PlanetsTransOrbit():
         nu3_start = self.calculator_end.calc_nu_from_r_vec(r3_vec, P_hat3_vec, Q_hat3_vec)
         return v3_start_vec, nu3_start
 
-    def trajectory_insertion(self, theta, r_h, v_in_vec, JS, r_a_planetary, oe_observation):
-        r_01_vec, r_12_vec, v0_end_vec, v1_start_vec, v1_end_vec, nu1_start, nu1_end, JS0_end, JS1_end = self.trajectory_insertion01(theta, r_h, v_in_vec, JS, r_a_planetary, oe_observation)
-        r_23_vec, v2_start_vec, v2_end_vec, nu2_start, nu2_end, JS2_end = self.trajectory_insertion12(oe_observation, r_12_vec, JS1_end)
-        v3_start_vec, nu3_start = self.trajectory_insertion23(oe_observation, r_23_vec, v2_end_vec, JS2_end)
+    def trajectory_insertion(self, theta, r_h, v_in_vec, JS0_start, r_a_planetary, oe_observation, target_is_perigee, plot_is_enabled = True):
 
-        fig = plt.figure()
-        ax = fig.add_subplot(111,projection = '3d')
-        ax.plot(r_12_vec[0],r_12_vec[1],r_12_vec[2], '.')
-        self.calculator_end.plot_trajectory(r_01_vec, v0_end_vec, JS, -70, 0, ax)
-        self.calculator_end.plot_trajectory(r_01_vec, v1_start_vec, JS, nu1_start, nu1_end, ax, 'k')
-        self.calculator_end.plot_trajectory(r_12_vec, v2_start_vec, JS1_end, nu2_start, nu2_end, ax, 'r')
-        self.calculator_end.plot_trajectory(r_23_vec, v3_start_vec, JS2_end, nu3_start, nu3_start+360, ax, 'b')
-        plt.show()
+        r_01_vec, r_12_vec, v0_end_vec, v1_start_vec, v1_end_vec, nu1_start, nu1_end, JS0_end, JS1_end = self.trajectory_insertion01(theta, r_h, v_in_vec, JS0_start, r_a_planetary, oe_observation)
+        r_23_vec, v2_start_vec, v2_end_vec, nu2_start, nu2_end, JS2_end = self.trajectory_insertion12(oe_observation, r_12_vec, JS1_end, target_is_perigee)
+        v3_start_vec, nu3_start = self.trajectory_insertion23(oe_observation, r_23_vec, v2_end_vec, JS2_end, target_is_perigee)
+
+        delta_v01 = np.linalg.norm(v0_end_vec - v1_start_vec)
+        delta_v12 = np.linalg.norm(v1_end_vec - v2_start_vec)
+        delta_v23 = np.linalg.norm(v2_end_vec - v3_start_vec)
+        delta_v_tot = delta_v01 + delta_v12 + delta_v23
+
+        if (plot_is_enabled):
+            fig = plt.figure()
+            ax = fig.add_subplot(111,projection = '3d')
+            ax.plot(r_12_vec[0],r_12_vec[1],r_12_vec[2], '.')
+            self.calculator_end.plot_trajectory(r_01_vec, v0_end_vec, JS0_start, -70, 0, ax)
+            self.calculator_end.plot_trajectory(r_01_vec, v1_start_vec, JS0_start, nu1_start, nu1_end, ax, 'k')
+            self.calculator_end.plot_trajectory(r_23_vec, v2_end_vec, JS1_end, nu2_start, nu2_end, ax, 'r')
+            self.calculator_end.plot_trajectory(r_23_vec, v3_start_vec, JS2_end, nu3_start, nu3_start+300, ax, 'b')
+            plt.show()
+
+        return delta_v_tot
