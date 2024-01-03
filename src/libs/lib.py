@@ -186,7 +186,7 @@ class TrajectoryCalculator():
         重力定数(m^3/s^2)
     """
 
-    def __init__(self, center_planet_name, threshold = 0.01, values = Values()):
+    def __init__(self, center_planet_name, threshold = 0.0001, values = Values()):
         self.values = values
         self.threshold = threshold
         self.mu = self.values.mu(center_planet_name)
@@ -205,10 +205,13 @@ class TrajectoryCalculator():
         """
         nu_rad = np.deg2rad(nu)
         p = a * (1 - e**2)
-        v_vec = (self.mu / p)**0.5 * (- np.sin(nu_rad) * P_hat_vec + (e + np.cos(nu_rad) * Q_hat_vec))
-        return v_vec
+        r = p / (1 + e * np.cos(nu_rad))
+        v_vec = (self.mu / p)**0.5 * (- np.sin(nu_rad) * P_hat_vec + (e + np.cos(nu_rad)) * Q_hat_vec)
+        r_vec = r * np.cos(nu_rad) * P_hat_vec + r * np.sin(nu_rad) * Q_hat_vec
+        return r_vec, v_vec
 
     def calc_nu_from_r_vec(self, r_vec, P_hat_vec, Q_hat_vec, check_threshold=0.001):
+        #fix me
         r_P = np.dot(r_vec.T, P_hat_vec)
         r_Q = np.dot(r_vec.T, Q_hat_vec)
         W_hat_vec = np.cross(P_hat_vec.T, Q_hat_vec.T)
@@ -234,12 +237,16 @@ class TrajectoryCalculator():
             cosE = r * np.cos(nu_rad) / a + e
             sinE = r * np.sin(nu_rad) / (a * (1 - e**2)**0.5)
             E_rad = np.arctan2(sinE, cosE)
+            if (E_rad < 0):
+                E_rad += 2 * np.pi
             n_rad = (self.mu / a**3)**0.5
             delta_t = (E_rad - e * sinE) / n_rad
         else:
             coshH = (-r / a + 1) / e
             sinhH = np.sin(nu_rad) * (e * coshH - 1)
             H_rad = np.arcsinh(sinhH)
+            if (H_rad < 0):
+                H_rad += 2 * np.pi
             n_rad = (-self.mu / a**3)**0.5
             delta_t = (e * sinhH - H_rad) / n_rad
         t = delta_t + t_p
@@ -360,8 +367,8 @@ class TrajectoryCalculator():
         v_vec : 3*1 ndarray(double)
             時刻JSのvの値(km/s)
         """
-        a,e,i,omega,Omega,t_p,_,_,_ = self.calc_orbital_elems_from_r_v(self, r_vec0 ,v_vec0, JS0)
-        return self.calc_r_v_from_orbital_elems(self,a,e,i,omega,Omega,t_p,JS)
+        a,e,i,omega,Omega,t_p,_,_,_ = self.calc_orbital_elems_from_r_v(r_vec0 ,v_vec0, JS0)
+        return self.calc_r_v_from_orbital_elems(a,e,i,omega,Omega,t_p,JS)
     
     def calc_r_v_from_orbital_elems(self,a,e,i,omega,Omega,t_p,JS):
         """
@@ -536,6 +543,7 @@ class TrajectoryCalculator():
         x = r*np.cos(nu)*P_hat_vec[0] + r*np.sin(nu)*Q_hat_vec[0]
         y = r*np.cos(nu)*P_hat_vec[1] + r*np.sin(nu)*Q_hat_vec[1]
         z = r*np.cos(nu)*P_hat_vec[2] + r*np.sin(nu)*Q_hat_vec[2]
+        r_ref = (x**2 + y**2 + z**2)**0.5
         ax.set_xlabel("x")
         ax.set_ylabel("y")
         ax.set_zlabel("z")
