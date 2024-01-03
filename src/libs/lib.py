@@ -211,6 +211,7 @@ class TrajectoryCalculator():
         return r_vec, v_vec
 
     def calc_nu_from_r_vec(self, r_vec, P_hat_vec, Q_hat_vec, check_threshold=0.001):
+        #fix me
         r_P = np.dot(r_vec.T, P_hat_vec)
         r_Q = np.dot(r_vec.T, Q_hat_vec)
         W_hat_vec = np.cross(P_hat_vec.T, Q_hat_vec.T)

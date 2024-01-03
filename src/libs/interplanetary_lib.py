@@ -557,15 +557,21 @@ class PlanetsTransOrbit():
         if (r_n_p > r_n_m):
             r_n = r_n_p
             r_n_vec = r_n * e_n_vec
+            if (np.dot(e_n_vec.T, Q_hat1_vec) > 0):
+                nu_n_rad = np.arccos(cos_nu_n)
+            else:
+                nu_n_rad = - np.arccos(cos_nu_n) +2 * np.pi
         else:
             r_n = r_n_m
             r_n_vec = - r_n * e_n_vec
+            if (np.dot(e_n_vec.T, Q_hat1_vec) < 0):
+                nu_n_rad = np.arccos(cos_nu_n)
+            else:
+                nu_n_rad = - np.arccos(cos_nu_n) +2 * np.pi
+        nu_n = np.rad2deg(nu_n_rad)
         P_hat1_vec, Q_hat1_vec, W_hat1_vec = self.calculator_end.calc_PQW_from_orbital_elems(a1,e1,i1,omega1,Omega1,t_p1)
-        nu_n = self.calculator_end.calc_nu_from_r_vec(r_n_vec, P_hat1_vec, Q_hat1_vec)
-        print("nu_n:", nu_n)
+        # nu_n = self.calculator_end.calc_nu_from_r_vec(r_n_vec, P_hat1_vec, Q_hat1_vec)
         r_n_ref_vec, v_n_vec = self.calculator_end.calc_rv_from_nu(nu_n, a1, e1, P_hat1_vec, Q_hat1_vec)
-        print((self.planet_end.mu * (2 / r_n[0,0] - 1 / a1))**0.5, np.linalg.norm(v_n_vec))
-        print(np.dot(W_hat1_vec.T, v_n_vec))
         return r_n_vec, v_n_vec, nu_n
     
     def trajectory_insertion12(self, oe_observation, r_12_vec, JS1_end, target_is_perigee):
@@ -743,11 +749,12 @@ class PlanetsTransOrbit():
             fig = plt.figure()
             ax = fig.add_subplot(111,projection = '3d')
             ax.plot(r_12_vec[0],r_12_vec[1],r_12_vec[2], '.')
-            self.calculator_end.plot_trajectory(r_01_vec, v0_end_vec, JS0_start, -70, 0, ax)
-            self.calculator_end.plot_trajectory(r_01_vec, v1_start_vec, JS0_end, nu1_start, nu1_end, ax, 'k')
+            self.calculator_end.plot_trajectory(r_01_vec, v0_end_vec, JS0_start, -80, 0, ax)
+            # self.calculator_end.plot_trajectory(r_01_vec, v1_start_vec, JS0_end, nu1_start, nu1_end, ax, 'g')
             self.calculator_end.plot_trajectory(r_12_vec, v1_end_vec, JS0_end, nu1_start, nu1_end, ax, 'k')
             self.calculator_end.plot_trajectory(r_12_vec, v2_start_vec, JS1_end, nu2_start, nu2_end, ax, 'r')
             self.calculator_end.plot_trajectory(r_23_vec, v3_start_vec, JS2_end, nu3_start, nu3_start+300, ax, 'b')
+            print("delta_v_tot,delta_v01 ,delta_v12 ,delta_v23 : ",delta_v_tot,delta_v01 ,delta_v12 ,delta_v23)
             plt.show()
 
         return delta_v_tot,delta_v01 ,delta_v12 ,delta_v23
