@@ -30,10 +30,11 @@ if __name__ == '__main__':
     oe_observation = (a, e, i, omega, Omega, tp)
     JS0_in = 0 # fix me
 
-    deg_max = 180
+    deg_max = 360
     r_h_max = 10 * mars.radius
-    v_in_max = 100 * (mars.mu / mars.radius**3)**0.5 # ?
+    v_in_max = 10 * (mars.mu / mars.radius**3)**0.5 # ?
     r_a_max = 100 * mars.radius
+    target_is_perigee = False
 
     def obfunc(individual):
         theta = individual[0] * deg_max
@@ -44,22 +45,23 @@ if __name__ == '__main__':
         v_in_vec = np.array([[v_in_x], [v_in_y], [v_in_z]])
         r_a = individual[5] * r_a_max
         
-        if(r_a < r_h or r_h < mars.radius or not(-deg_max < theta < deg_max)):
+        if(r_a < r_h or r_h < mars.radius or not(0 < theta < deg_max)):
             object = np.inf
         else:
-            object = earth_mars.trajectory_insertion(theta, r_h, v_in_vec, JS0_in, r_a, oe_observation, plot_is_enabled=False)
+            delta_v_tot,delta_v01 ,delta_v12 ,delta_v23 = earth_mars.trajectory_insertion(theta, r_h, v_in_vec, JS0_in, r_a, oe_observation,target_is_perigee, plot_is_enabled=False)
+            object = delta_v12 + delta_v23
 
         return object,
     
     creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
     creator.create("Individual", list, fitness=creator.FitnessMin)
     toolbox = base.Toolbox()
-    toolbox.register("attr_gene", random.uniform, -1, 1)
+    toolbox.register("attr_gene", random.uniform, 0, 1)
     toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_gene, 6)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("select", tools.selTournament, tournsize=5)
     toolbox.register("mate", tools.cxBlend,alpha=0.2)
-    toolbox.register("mutate", tools.mutGaussian, mu=[0.0, 0.0], sigma=[20.0, 20.0], indpb=0.2)
+    toolbox.register("mutate", tools.mutGaussian, mu=[0.5, 0.5, 0.5, 0.5, 0.5,0.5], sigma=[1.,1.,1.,1.,1.,1.], indpb=0.2)
     toolbox.register("evaluate", obfunc)
     #以下でパラメータの設定
     #今回は最も単純な遺伝的アルゴリズムの手法を採用
@@ -68,11 +70,11 @@ if __name__ == '__main__':
     #何世代まで行うか
     NGEN = 50
     #集団の個体数
-    POP = 80
+    POP = 200
     #交叉確率
     CXPB = 0.9
     #個体が突然変異を起こす確率
-    MUTPB = 0.1
+    MUTPB = 0.3
     #集団は80個体という情報の設定
     pop = toolbox.population(n=POP)
     #集団内の個体それぞれの適応度（目的関数の値）を計算
@@ -86,3 +88,12 @@ if __name__ == '__main__':
     best_ind = tools.selBest(pop, 1)[0]
     #結果表示
     print("最も良い個体は %sで、そのときの目的関数の値は %s" % (best_ind, best_ind.fitness.values))
+
+    theta = best_ind[0] * deg_max
+    r_h = best_ind[1] * r_h_max
+    v_in_x = best_ind[2] * v_in_max
+    v_in_y = best_ind[3] * v_in_max
+    v_in_z = best_ind[4] * v_in_max
+    v_in_vec = np.array([[v_in_x], [v_in_y], [v_in_z]])
+    r_a = best_ind[5] * r_a_max
+    val = earth_mars.trajectory_insertion(theta, r_h, v_in_vec, JS0_in, r_a, oe_observation,target_is_perigee)
