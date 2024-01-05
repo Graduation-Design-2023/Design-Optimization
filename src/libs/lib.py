@@ -252,7 +252,7 @@ class TrajectoryCalculator():
         t = delta_t + t_p
         return t
 
-    def solve_Kepler(self,a,e,t_p,t,E0):
+    def solve_Kepler(self,a,e,t_p,t,E0,count_max = 1000, alpha = 0.1):
         """
         ニュートンラフソン法でケプラー方程式を解く
         引数--------------------------
@@ -273,10 +273,17 @@ class TrajectoryCalculator():
             時刻tのEの値(deg)
         """
         E_pre_rad = np.radians(E0)
-        E_rad = E_pre_rad - (E_pre_rad - e * np.sin(E_pre_rad) - (self.mu / a**3)**0.5 *(t - t_p)) / (1 - e * np.cos(E_pre_rad))
+        period = self.calc_period(a)
+        t = t_p + (t - t_p) % period
+        E_rad = E_pre_rad - alpha * (E_pre_rad - e * np.sin(E_pre_rad) - (self.mu / a**3)**0.5 *(t - t_p)) / (1 - e * np.cos(E_pre_rad))
+        count = 0
         while(np.abs(E_pre_rad - E_rad) >= self.threshold):
+            if (count > count_max):
+                print("kepler solver has failed")
+                break
             E_pre_rad = E_rad
-            E_rad = E_pre_rad - (E_pre_rad - e * np.sin(E_pre_rad) - (self.mu / a**3)**0.5 *(t - t_p)) / (1 - e * np.cos(E_pre_rad))
+            E_rad = E_pre_rad - alpha * (E_pre_rad - e * np.sin(E_pre_rad) - (self.mu / a**3)**0.5 *(t - t_p)) / (1 - e * np.cos(E_pre_rad))
+            count += 1
         return np.degrees(E_rad)
     
     def solve_hyperbola_eq(self,a,e,t_p,t,H0):

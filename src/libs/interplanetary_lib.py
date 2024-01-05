@@ -385,14 +385,15 @@ class PlanetsTransOrbit():
         N_hat_vec = np.cross(k_hat_vec.T,W_hat_vec.T).T / np.linalg.norm(np.cross(k_hat_vec.T,W_hat_vec.T))
 
         # calc remaining orbital elements
-        i = np.arccos(np.dot(W_hat_vec.T,k_hat_vec))
-        Omega = np.arctan2(- W_hat_vec[1][0]/(W_hat_vec[0][0]**2 + W_hat_vec[1][0]**2)**0.5, W_hat_vec[0][0]/(W_hat_vec[0][0]**2 + W_hat_vec[1][0]**2)**0.5)
-        if (Omega < 0):
-            Omega = Omega + 2 * np.pi
+        i_rad = np.arccos(np.dot(W_hat_vec.T,k_hat_vec))
+        Omega_rad = np.arctan2(- W_hat_vec[1][0]/(W_hat_vec[0][0]**2 + W_hat_vec[1][0]**2)**0.5, W_hat_vec[0][0]/(W_hat_vec[0][0]**2 + W_hat_vec[1][0]**2)**0.5)
+        if (Omega_rad < 0):
+            Omega_rad = Omega_rad + 2 * np.pi
+        # Omega_rad[Omega_rad<0] = Omega_rad[Omega_rad<0] + 2 * np.pi
         r_h_vec = r_h  * (np.sin(phi_B_rad/2) * S_I_hat_vec + np.cos(phi_B_rad) * B_vec / b)
         v_h_vec = v_h  * (np.cos(phi_B_rad/2) * S_I_hat_vec - np.sin(phi_B_rad) * B_vec / b)
-        omega = np.arctan2(np.dot(N_hat_vec.T,r_h_vec)/r_h, np.dot(np.cross(W_hat_vec.T, N_hat_vec.T), r_h_vec)/r_h)
-        oes = (a,e,i,omega,Omega)
+        omega_rad = np.arctan2(np.dot(N_hat_vec.T,r_h_vec)/r_h, np.dot(np.cross(W_hat_vec.T, N_hat_vec.T), r_h_vec)/r_h)
+        oes = (a,e,np.rad2deg(i_rad),np.rad2deg(omega_rad),np.rad2deg(Omega_rad))
         return v_inf_out_vec, v_inf_out_vec+v_planet_vec, r_h_vec, v_h_vec, oes
     
     def trajectory_by_lambert(self, time_start, duration):

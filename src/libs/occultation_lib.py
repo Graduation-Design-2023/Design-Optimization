@@ -161,3 +161,7 @@ class Occultation():
             theta += dt * self.planet.rotation_omega
 
         return longitude_list, latitude_list, count
+    
+    # def spatial_resolution(self, grid_width_lon, grid_width_lat, longitude_list, latitude_list):
+
+    # def time_resolution(self, ):
