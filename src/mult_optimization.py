@@ -111,10 +111,13 @@ if __name__ == "__main__":
     # 結果の可視化
     ps = problem.pareto_set(use_cache=False, flatten=False)
     pf = problem.pareto_front(use_cache=False, flatten=False)
+    pop = res.pop
     
     # 目的関数空間
     plot = Scatter(title = "Objective Space")
-    plot.add(res.F)
+    plot.add(pop.get("F"),color="black")
+    plot.add(res.F, color = "red")
+    print(res.X)
     if pf is not None:
-        plot.add(pf, plot_type="line", color="black", alpha=0.7)
+        plot.add(pf, plot_type="line", color="red", alpha=0.7)
     plot.show()
