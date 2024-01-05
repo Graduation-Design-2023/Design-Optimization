@@ -47,7 +47,7 @@ _,_,_,_,v_planet_start,v_planet_end,v_sat_start,v_sat_end = earth_mars.trajector
 v_inf_vec = v_sat_end - v_planet_end
 
 xl_array = np.array([0, radius, radius, radius, 0, 0, 0, 0, 0, radius, 0, 0, 0, 0, 0])
-xu_array = np.array([360, radius*10, radius*100, radius*10, 1, 180, 360, 360, period, radius*2, 1, 180, 360, 360, period])
+xu_array = np.array([360, radius*2, radius*3, radius*1.5, 1, 180, 360, 360, period, radius*1.5, 1, 180, 360, 360, period])
 # ----------------------------
 # X : [theta, r_h, r_a, a1, e1, i1, omega1, Omega1, t_p1, a2, e2, i2, omega2, Omega2, t_p2]
 class MyProblem(Problem):
@@ -63,6 +63,7 @@ class MyProblem(Problem):
         n = len(X[:,0])
         f1 = np.zeros(n)
         f2 = np.zeros(n)
+        f3 = np.zeros(n)
         for i in range(0, n):
             oe_observation1 = (X[i,3], X[i,4], X[i,5], X[i,6], X[i,7], X[i,8])
             oe_observation2 = (X[i,9], X[i,10], X[i,11], X[i,12], X[i,13], X[i,14])
@@ -76,7 +77,9 @@ class MyProblem(Problem):
             f1[i] = dv1_12 + dv1_23 + dv2_12 + dv2_23
 
             longitude_list, latitude_list, count = occultation.simulate_position_observed(0, t0, t_end, dt)
-            f2[i] = -count
+            time, spatial = occultation.calc_evaluation(10,10,longitude_list, latitude_list)
+            f2[i] = -time
+            # f3[i] = -s/atial
 
         out["F"] = np.column_stack([f1, f2])
     
@@ -91,7 +94,7 @@ if __name__ == "__main__":
         sampling=LHS(),
         crossover=SBX(prob=0.9, eta=15),
         mutation=PolynomialMutation(eta=20),
-        eliminate_duplicates=True
+        # eliminate_duplicates=True
     )
     
     # 終了条件（40世代）

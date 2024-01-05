@@ -509,9 +509,9 @@ class TrajectoryCalculator():
             ECEF座標系での座標
         返り値--------------------------
         longitude : double
-            経度
+            経度(-180~180)
         latitude : double
-            緯度
+            緯度(-90~90)
         """
         longitude_rad = np.arctan2(r_ecef[1], r_ecef[0])
         longitude = np.degrees(longitude_rad)
