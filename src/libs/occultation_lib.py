@@ -161,3 +161,16 @@ class Occultation():
             theta += dt * self.planet.rotation_omega
 
         return longitude_list, latitude_list, count
+    
+    def calc_evaluation(self, grid_width_lon, grid_width_lat, longitude_list, latitude_list):
+        lon_int = np.uint8((longitude_list + 180) / grid_width_lon)
+        lat_int = np.uint8((latitude_list + 90) / grid_width_lat)
+        n_lon = np.uint8(360 / grid_width_lon)
+        n_lat = np.uint8(180 / grid_width_lat)
+        observation_grid = np.zeros((n_lon,n_lat))
+        for i in range(0, len(lon_int)):
+            observation_grid[lon_int[i], lat_int[i]] += 1
+        spatial_evaluation = np.count_nonzero(observation_grid)
+        time_evaluation = np.sum(observation_grid) / n_lon / n_lat
+        return spatial_evaluation, time_evaluation
+
