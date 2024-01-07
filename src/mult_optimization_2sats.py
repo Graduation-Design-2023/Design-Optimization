@@ -28,8 +28,8 @@ sun_calculator = TrajectoryCalculator("Sun")
 mars_calculator = TrajectoryCalculator("Mars")
 # PlanetTrans
 earth_mars = PlanetsTransOrbit(earth, mars)
-sat1 = Satellite(mars)
-sat2 = Satellite(mars)
+sat1 = Satellite(mars, receiver_is_avalable=True)
+sat2 = Satellite(mars, receiver_is_avalable=True)
 #vals
 t0 = 0
 t_end = 1 * 24 * 60**2
@@ -73,7 +73,7 @@ class MyProblem(Problem):
             occultation = Occultation(mars,[sat1,sat2])
 
             dv1, dv1_01, dv1_12, dv1_23 = earth_mars.trajectory_insertion(X[i,0], X[i,1], v_inf_vec, JS0_in, X[i,2], oe_observation1, target_is_perigee, plot_is_enabled=False)
-            dv2, dv2_01, dv2_12, dv2_23= earth_mars.trajectory_insertion(X[i,0], X[i,1], v_inf_vec, JS0_in, X[i,2], oe_observation1, target_is_perigee, plot_is_enabled=False)
+            dv2, dv2_01, dv2_12, dv2_23= earth_mars.trajectory_insertion(X[i,0], X[i,1], v_inf_vec, JS0_in, X[i,2], oe_observation2, target_is_perigee, plot_is_enabled=False)
             f1[i] = dv1_12 + dv1_23 + dv2_12 + dv2_23
 
             longitude_list, latitude_list, count = occultation.simulate_position_observed(0, t0, t_end, dt)
@@ -89,8 +89,8 @@ if __name__ == "__main__":
     
     # アルゴリズムの初期化（NSGA-IIを使用）
     algorithm = NSGA2(
-        pop_size=100,
-        n_offsprings=100,
+        pop_size=10,
+        n_offsprings=10,
         sampling=LHS(),
         crossover=SBX(prob=0.9, eta=15),
         mutation=PolynomialMutation(eta=20),
@@ -98,7 +98,7 @@ if __name__ == "__main__":
     )
     
     # 終了条件（40世代）
-    termination = get_termination("n_gen", 40)
+    termination = get_termination("n_gen", 20)
     
     # 最適化の実行
     res = minimize(problem,
