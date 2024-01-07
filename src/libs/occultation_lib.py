@@ -3,9 +3,10 @@ import numpy as np
 from matplotlib import pyplot as plot_trajectory
 
 class Satellite():
-    def __init__(self, planet, calculator = TrajectoryCalculator):
+    def __init__(self, planet, receiver_is_avalable = True, calculator = TrajectoryCalculator):
         self.planet = planet
         self.calculator = calculator(planet.planet_name)
+        self.receiver_is_avalable = receiver_is_avalable
 
     def init_orbit_by_orbital_elems(self, a, e, i, omega, Omega, t_p):
         self.orbital_elems = np.array([a, e, i, omega, Omega, t_p])
@@ -31,7 +32,7 @@ class Occultation():
         self.trajectory_calculator = calculator(planet.planet_name)
         
     
-    def get_position_observed(self, r1, r2):
+    def get_position_observed(self, r1, r2, receiver_is_avalable1, receiver_is_avalable2):
         """観測点を求める
         引数--------------------------
             r1,r2 : 3*1 ndarray(double)
@@ -51,6 +52,9 @@ class Occultation():
         if (distance < self.planet.radius and np.dot((r1 - r_h).T,r2 - r_h) < 0):
             is_occultated = True
         else:
+            is_occultated = False
+
+        if (not(receiver_is_avalable1) and not(receiver_is_avalable2)):
             is_occultated = False
 
         return distance, r_h, is_occultated
@@ -74,7 +78,7 @@ class Occultation():
         return longitude, latitude
 
     def get_position_observed_mult(self, sats, t):
-        """観測点を求める
+        """観測点を求める(at t)
         引数--------------------------
         sats : list(Satellite)
             衛星たち
@@ -95,7 +99,7 @@ class Occultation():
                     break
                 ri, _ = sats[i].get_rv(t)
                 rj, _ = sats[j].get_rv(t)
-                _, r_h, is_occultated = self.get_position_observed(ri, rj)
+                _, r_h, is_occultated = self.get_position_observed(ri, rj, sats[i].receiver_is_avalable,sats[j].receiver_is_avalable)
                 r_h_list[i][j] = r_h.T
                 is_occultated_list[i][j] = is_occultated
         return r_h_list, is_occultated_list
