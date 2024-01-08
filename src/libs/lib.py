@@ -286,7 +286,7 @@ class TrajectoryCalculator():
             count += 1
         return np.degrees(E_rad)
     
-    def solve_hyperbola_eq(self,a,e,t_p,t,H0):
+    def solve_hyperbola_eq(self,a,e,t_p,t,H0, alpha = 0.1):
         """
         ニュートンラフソン法で双曲線の方程式を解く
         引数--------------------------
@@ -305,10 +305,10 @@ class TrajectoryCalculator():
             時刻tのHの値(deg)
         """
         H_pre_rad = np.radians(H0)
-        H_rad = H_pre_rad - (e * np.sinh(H_pre_rad) - H_pre_rad - (self.mu / -a**3)**0.5 * (t - t_p)) / (e * np.cosh(H_pre_rad) - 1)
+        H_rad = H_pre_rad - alpha*(e * np.sinh(H_pre_rad) - H_pre_rad - (self.mu / -a**3)**0.5 * (t - t_p)) / (e * np.cosh(H_pre_rad) - 1)
         while(np.abs(H_pre_rad - H_rad) >= self.threshold):
             H_pre_rad = H_rad
-            H_rad = H_pre_rad - (e * np.sinh(H_pre_rad) - H_pre_rad - (self.mu / -a**3)**0.5 *(t - t_p)) / (e * np.cosh(H_pre_rad) - 1)
+            H_rad = H_pre_rad - alpha*(e * np.sinh(H_pre_rad) - H_pre_rad - (self.mu / -a**3)**0.5 *(t - t_p)) / (e * np.cosh(H_pre_rad) - 1)
         return np.rad2deg(H_rad)
     
     def calc_PQW_from_orbital_elems(self,a,e,i,omega,Omega,t_p):
