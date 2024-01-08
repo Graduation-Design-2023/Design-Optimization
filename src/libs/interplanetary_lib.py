@@ -338,7 +338,7 @@ class PlanetsTransOrbit():
             sol[i] =  np.array([self.values.convert_JD_to_times(JD_array[i])])
         return sol, t_H
     
-    def swingby(self,planet,theta_rad,r_h,v_B_vec,JS):
+    def swingby(self,planet,theta_rad,r_h,v_inf_in_vec,JS):
         """
         input-------------------
         planet : Planet
@@ -347,14 +347,13 @@ class PlanetsTransOrbit():
             angle between B and T_hat
         r_h : double
             distance from planet at closest approach
-        v_B_vec : 3*1 ndarray
-            v_in(sun centered)
+        v_inf_in_vec : 3*1 ndarray
+            v_in_inf(planet centered)
         JS : double
             time starting swingby    
         """
         k_hat_vec = np.array([[0],[0],[1]])
         r_planet_vec,v_planet_vec = planet.position_JS(JS) 
-        v_inf_in_vec = v_B_vec - v_planet_vec 
         v_inf = np.linalg.norm(v_inf_in_vec)
 
         # calc orbital elements(planet centered)
@@ -364,7 +363,7 @@ class PlanetsTransOrbit():
 
         # calc b
         phi_B_rad = 2 * np.arcsin(1 / (1 + r_h * v_inf**2 / planet.mu))
-        b = r_h * (1 + 2 * planet.mu / r_h / v_inf**2 )
+        b = r_h * (1 + 2 * planet.mu / r_h / v_inf**2 )**0.5
 
         # calc unit vectors and B vector
         S_I_hat_vec = v_inf_in_vec / v_inf
@@ -386,12 +385,12 @@ class PlanetsTransOrbit():
 
         # calc remaining orbital elements
         i_rad = np.arccos(np.dot(W_hat_vec.T,k_hat_vec))
-        Omega_rad = np.arctan2(- W_hat_vec[1][0]/(W_hat_vec[0][0]**2 + W_hat_vec[1][0]**2)**0.5, W_hat_vec[0][0]/(W_hat_vec[0][0]**2 + W_hat_vec[1][0]**2)**0.5)
+        Omega_rad = np.arctan2(- W_hat_vec[0][0]/(W_hat_vec[0][0]**2 + W_hat_vec[1][0]**2)**0.5, W_hat_vec[1][0]/(W_hat_vec[0][0]**2 + W_hat_vec[1][0]**2)**0.5)
         if (Omega_rad < 0):
             Omega_rad = Omega_rad + 2 * np.pi
         # Omega_rad[Omega_rad<0] = Omega_rad[Omega_rad<0] + 2 * np.pi
-        r_h_vec = r_h  * (np.sin(phi_B_rad/2) * S_I_hat_vec + np.cos(phi_B_rad) * B_vec / b)
-        v_h_vec = v_h  * (np.cos(phi_B_rad/2) * S_I_hat_vec - np.sin(phi_B_rad) * B_vec / b)
+        r_h_vec = r_h  * (np.sin(phi_B_rad/2) * S_I_hat_vec + np.cos(phi_B_rad/2) * B_vec / b)
+        v_h_vec = v_h  * (np.cos(phi_B_rad/2) * S_I_hat_vec - np.sin(phi_B_rad/2) * B_vec / b)
         omega_rad = np.arctan2(np.dot(N_hat_vec.T,r_h_vec)/r_h, np.dot(np.cross(W_hat_vec.T, N_hat_vec.T), r_h_vec)/r_h)
         oes = (a,e,np.rad2deg(i_rad),np.rad2deg(omega_rad),np.rad2deg(Omega_rad))
         return v_inf_out_vec, v_inf_out_vec+v_planet_vec, r_h_vec, v_h_vec, oes
@@ -469,7 +468,7 @@ class PlanetsTransOrbit():
         v_inf_start = v_sat_start - v_planet_start
         return r_start, v_sat_start, v_planet_start,r_tcm, v_sat_before_tcm, v_sat_after_tcm, r_end, v_sat_end, v_planet_end
     
-    def trajectory_insertion01(self,theta,r_h,v_in_vec,JS,r_a_planetary,oe_observation):
+    def trajectory_insertion01(self,theta,r_h,v_inf_vec,JS,r_a_planetary,oe_observation):
         """
         use coapsidal capture orbit for insertion into planetary orbit(1)
         input-------------------
@@ -477,8 +476,8 @@ class PlanetsTransOrbit():
             angle between B and T_hat
         r_h : double
             distance from planet at closest approach
-        v_in_vec : 3*1 ndarray
-            v_in(sun centered)
+        v_inf_vec : 3*1 ndarray
+            v_inf
         JS : double
             time entering target planet gravity field   
         r_a_planetary : double
@@ -496,7 +495,7 @@ class PlanetsTransOrbit():
         """
         # values of trans trajectory"
         theta_rad = np.deg2rad(theta)
-        _,_,r_01_vec, v0_end_vec, oes = self.swingby(self.planet_end,theta_rad, r_h, v_in_vec, JS)
+        _,_,r_01_vec, v0_end_vec, oes = self.swingby(self.planet_end,theta_rad, r_h, v_inf_vec, JS)
         r_01 = np.linalg.norm(r_01_vec)
         v0_end = np.linalg.norm(v0_end_vec)
         JS0_end = JS #fix me
@@ -504,6 +503,7 @@ class PlanetsTransOrbit():
         # values of planetary orbit
         v1_start = (self.planet_end.mu * (2/r_h - 2/(r_h + r_a_planetary)))**0.5
         v1_start_vec = v1_start * v0_end_vec / v0_end
+        # print(v1_start, v0_end)
         a1, e1, i1, omega1, Omega1, t_p1, P_hat1_vec, Q_hat1_vec, W_hat1_vec = self.calculator_end.calc_orbital_elems_from_r_v(r_01_vec, v1_start_vec, JS0_end)
         
         if (r_a_planetary > r_h):# is perigee
