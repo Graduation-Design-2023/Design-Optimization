@@ -6,6 +6,9 @@ from libs.interplanetary_lib import PlanetsTransOrbit
 
 import numpy as np
 from matplotlib import pyplot as plt
+import json
+import os 
+from datetime import datetime
 
 from pymoo.util.misc import stack
 from pymoo.core.problem import Problem
@@ -84,6 +87,10 @@ class MyProblem(Problem):
         out["F"] = np.column_stack([f1, f2])
     
 if __name__ == "__main__":
+    now = datetime.now()
+    folder_name = "outputs/runs"
+    file_name = f"{folder_name}/{now.strftime('%Y%m%d%H%M%S')}.json"
+    os.makedirs(folder_name, exist_ok=True)
     # 問題の定義
     problem = MyProblem()
     
@@ -93,7 +100,7 @@ if __name__ == "__main__":
         n_offsprings=10,
         sampling=LHS(),
         crossover=SBX(prob=0.9, eta=15),
-        mutation=PolynomialMutation(eta=20),
+        mutation=PolynomialMutation(eta=50),
         # eliminate_duplicates=True
     )
     
@@ -117,7 +124,13 @@ if __name__ == "__main__":
     plot = Scatter(title = "Objective Space")
     plot.add(pop.get("F"),color="black")
     plot.add(res.F, color = "red")
-    print(res.X)
+    print(res.X.shape, res.F.shape)
+    output = np.concatenate([res.F, res.X], axis=1)
+    # output: [f1, f2, theta, r_h, r_a, a1, e1, i1 ...]
+    print(output)
+    with open(file_name, "w") as f:
+        json.dump(output.tolist(), f, indent=" ")   
     if pf is not None:
         plot.add(pf, plot_type="line", color="red", alpha=0.7)
     plot.show()
+    plot.save("outputs/mult_optimization_2sats.png")

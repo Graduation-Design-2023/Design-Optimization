@@ -49,7 +49,7 @@ class Occultation():
         r_h = r1 - (np.dot(r1.T, r_rel) / np.linalg.norm(r_rel)**2 * r_rel)
         distance = np.linalg.norm(r_h)
         
-        if (distance < self.planet.radius and np.dot((r1 - r_h).T,r2 - r_h) < 0):
+        if self.planet.radius < distance and distance < self.planet.radius + 11 and np.dot((r1 - r_h).T,r2 - r_h) < 0:
             is_occultated = True
         else:
             is_occultated = False
@@ -139,7 +139,8 @@ class Occultation():
             r_h_list, is_occultated_list = self.get_position_observed_mult(self.sats, t)
 
             # 掩蔽開始時
-            mask1 = is_occultated_list & is_first_list & mask_tri
+            # mask1 = is_occultated_list & is_first_list & mask_tri
+            mask1 = is_occultated_list & mask_tri
             r_h_true_list1 = r_h_list[mask1]
             for j in range(len(r_h_true_list1)):
                 count += 1
@@ -148,13 +149,13 @@ class Occultation():
                 longitude_list = np.append(longitude_list, longitude)
 
             # 掩蔽終了時
-            mask2 = ~is_occultated_list & prev_is_occultated_list & mask_tri
-            r_h_true_list2 = r_h_list[mask2]
-            for j in range(len(r_h_true_list2)):
-                count += 1
-                longitude, latitude =  self.geodetic_position_observed(r_h_true_list2[j], theta)
-                latitude_list = np.append(latitude_list, latitude)
-                longitude_list = np.append(longitude_list, longitude)
+            # mask2 = ~is_occultated_list & prev_is_occultated_list & mask_tri
+            # r_h_true_list2 = r_h_list[mask2]
+            # for j in range(len(r_h_true_list2)):
+            #     count += 1
+            #     longitude, latitude =  self.geodetic_position_observed(r_h_true_list2[j], theta)
+            #     latitude_list = np.append(latitude_list, latitude)
+            #     longitude_list = np.append(longitude_list, longitude)
 
             prev_is_occultated_list[is_occultated_list] = True
             prev_is_occultated_list[~is_occultated_list] = False

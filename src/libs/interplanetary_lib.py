@@ -766,5 +766,6 @@ class PlanetsTransOrbit():
             self.calculator_end.plot_trajectory(r_23_vec, v3_start_vec, JS2_end, nu3_start, nu3_start+359, ax, 'b')
             print("delta_v_tot,delta_v01 ,delta_v12 ,delta_v23 : ",delta_v_tot,delta_v01 ,delta_v12 ,delta_v23)
             plt.show()
+            plt.savefig("outputs/test_insertion.png")
 
         return delta_v_tot,delta_v01 ,delta_v12 ,delta_v23

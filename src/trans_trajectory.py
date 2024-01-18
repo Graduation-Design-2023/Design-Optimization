@@ -4,6 +4,7 @@ from libs.interplanetary_lib import PlanetsTransOrbit
 
 import numpy as np
 from matplotlib import pyplot as plt
+import os 
 
 if __name__ == '__main__':
     #Values
@@ -46,7 +47,9 @@ if __name__ == '__main__':
         plt.ylabel("v_inf_start(km/s)")
         plt.xlim(0,10)
         plt.ylim(0,10)
-    plt.legend() 
+    plt.legend()
+    os.makedirs("outputs/", exist_ok=True)
+    plt.savefig("outputs/trans_trajectory.png")
     plt.show()
 
     

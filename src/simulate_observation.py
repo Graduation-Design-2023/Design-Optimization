@@ -25,32 +25,38 @@ if __name__ == '__main__':
     theta0 = 0 #fix me
     target_planet = mars
     t0 = 0
-    t_end = 1 * 24 * 60**2
-    dt = 500
+    t_end = 30 * 24 * 60**2
+    dt = 60
+    import json
+    import argparse 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("result_file_name")
+    parser.add_argument("selected_pareto_idx", type=int)
+    args = parser.parse_args()
+    with open(args.result_file_name, "r") as f:
+        results = json.load(f)
+        result = results[args.selected_pareto_idx]
+        num_sat = (len(result) - 3) // 6
+        print(num_sat)
+    sat_list = []
 
-    a_c = target_planet.radius + 2124
-    e_c = 0.2231
-    i_c = 0
-    omega_c = 50
-    Omega_c = 0
-    tp_c = 0
-
-    a_d1 = target_planet.radius + 37124
-    e_d1 = 0.8529
-    i_d1 = 20
-    omega_d1 = 50
-    Omega_d1 = 0
-    tp_d1 = 0
-    tp_d2 = 2 * np.pi / (target_planet.mu / a_d1**3)**0.5 * 105 / 360
-
-    sat1 = Satellite(target_planet)
-    sat2 = Satellite(target_planet)
-    sat3 = Satellite(target_planet)
-    sat1.init_orbit_by_orbital_elems(a_c, e_c, i_c, omega_c, Omega_c, tp_c)
-    sat2.init_orbit_by_orbital_elems(a_d1, e_d1, i_d1, omega_d1, Omega_d1, tp_d1)
-    sat3.init_orbit_by_orbital_elems(a_d1, e_d1, i_d1, omega_d1, Omega_d1, tp_d2)
+    for i in range(num_sat):
+        sat = Satellite(target_planet)
+        a, e, i, omega, Omega, tp = result[5 + 6 * i: 5 + 6 * (i + 1)]
+        # a, e, i, omega, Omega, tp = result[3 + 6 * i: 3 + 6 * (i + 1)]
+        sat.init_orbit_by_orbital_elems(a, e, i, omega, Omega, tp)
+        sat_list.append(sat)
+    
     #OccultationCalculator
-    venus_occultation = Occultation(target_planet,[sat1,sat2])
-    longitude_list, latitude_list, count = venus_occultation.simulate_position_observed(0, t0, t_end, dt)
+    mars_occultation = Occultation(target_planet, sat_list)
+    longitude_list, latitude_list, count = mars_occultation.simulate_position_observed(0, t0, t_end, dt)
     plt.plot(longitude_list, latitude_list,'.')
+    plt.xlim(-180, 180)
+    plt.ylim(-90, 90)
+    xticks=np.arange(-180, 180, 30)
+    yticks=np.arange(-90, 90, 30)
+    plt.xticks(xticks)
+    plt.yticks(yticks)
+    plt.grid()
     plt.show()
+    plt.savefig("outputs/simulate_observation.png")

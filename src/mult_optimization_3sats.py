@@ -5,7 +5,9 @@ from libs.occultation_lib import Satellite, Occultation
 from libs.interplanetary_lib import PlanetsTransOrbit
 
 import numpy as np
-from matplotlib import pyplot as plt
+import json
+from datetime import datetime
+import os 
 
 from pymoo.util.misc import stack
 from pymoo.core.problem import Problem
@@ -50,6 +52,9 @@ v_inf_vec = v_sat_end - v_planet_end
 xl_array = np.array([0, radius, radius, radius, 0, 0, 0, 0, 0, radius, 0, 0, 0, 0, 0,radius, 0, 0, 0, 0, 0])
 xu_array = np.array([360, radius*2, radius*3, radius*1.5, 1, 180, 360, 360, period, radius*1.5, 1, 180, 360, 360, period, radius*1.5, 1, 180, 360, 360, period])
 # ----------------------------
+# theta: 衝突面角度
+# r_h: 進入時の双曲線軌道の近地点距離
+# r_a: キャプチャ軌道のアポジ点距離
 # X : [theta, r_h, r_a, a1, e1, i1, omega1, Omega1, t_p1, a2, e2, i2, omega2, Omega2, t_p2, a3, e3, i3, omega3, Omega3, t_p3]
 class MyProblem(Problem):
     def __init__(self):
@@ -88,6 +93,11 @@ class MyProblem(Problem):
         out["F"] = np.column_stack([f1, f2])
     
 if __name__ == "__main__":
+    now = datetime.now()
+    folder_name = "outputs/runs"
+    file_name = f"{folder_name}/{now.strftime('%Y%m%d%H%M%S')}.json"
+    os.makedirs(folder_name, exist_ok=True)
+
     # 問題の定義
     problem = MyProblem()
     
@@ -121,7 +131,13 @@ if __name__ == "__main__":
     plot = Scatter(title = "Objective Space")
     plot.add(pop.get("F"),color="black")
     plot.add(res.F, color = "red")
-    print(res.X)
+    print(res.X.shape, res.F.shape)
+    output = np.concatenate([res.F, res.X], axis=1)
+    # output: [f1, f2, theta, r_h, r_a, a1, e1, i1 ...]
+    print(output)
+    with open(file_name, "w") as f:
+        json.dump(output.tolist(), f, indent=" ")
     if pf is not None:
         plot.add(pf, plot_type="line", color="red", alpha=0.7)
     plot.show()
+    plot.save("outputs/mult_optimization_3sats.png")

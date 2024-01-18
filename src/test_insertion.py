@@ -23,12 +23,12 @@ if __name__ == '__main__':
     venus_calculator = TrajectoryCalculator("Venus")
 
     earth_mars = PlanetsTransOrbit(earth, mars)
-    a = mars.radius + 21240
-    e = 0.2231
-    i = 80
-    omega = 50
-    Omega = 0
-    tp= 0 #invalid
+    a = 3761 
+    e = 0.459
+    i = 150
+    omega = 260
+    Omega = 124.5
+    tp= 15943 #invalid
     oe_observation = (a, e, i, omega, Omega, tp)
 
     theta = 70
