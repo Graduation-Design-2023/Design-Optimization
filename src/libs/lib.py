@@ -164,7 +164,7 @@ class Values():
         rotation_period_dic = {
         "Sun"    : 25.379995 * 60**2 * 24,
         "Mercury": 58.6462 * 60**2 * 24,
-        "Venus"  : -243.0187 * 60**2 * 24,
+        "Venus"  : 4 * 60**2 * 24,
         "Earth"  : 0.99726968 * 60**2 * 24,
         "Mars"   : 1.02595675 * 60**2 * 24,
         "Jupiter": 0.41007 * 60**2 * 24,
@@ -522,7 +522,7 @@ class TrajectoryCalculator():
 
         return longitude, latitude
     
-    def plot_trajectory(self, r_vec, v_vec, JS, nu_start, nu_end, ax, col = 'k'):
+    def plot_trajectory(self, r_vec, v_vec, JS, nu_start, nu_end, ax, col = 'k', projection="3d"):
         """
         plot trajectory from nu_start to nu_end
         input---------------------
@@ -551,11 +551,36 @@ class TrajectoryCalculator():
         y = r*np.cos(nu)*P_hat_vec[1] + r*np.sin(nu)*Q_hat_vec[1]
         z = r*np.cos(nu)*P_hat_vec[2] + r*np.sin(nu)*Q_hat_vec[2]
         r_ref = (x**2 + y**2 + z**2)**0.5
+        if (projection == "3d"):
+            ax.set_xlabel("x")
+            ax.set_ylabel("y")
+            ax.set_zlabel("z")
+            ax.plot(x,y,z,color = col)
+            ax.view_init(elev=0, azim=70)
+        else:
+            ax.set_xlabel("x")
+            ax.set_ylabel("y")
+            ax.plot(x,y,color = col)
+
+    def plot_trajectory_by_oe(self, a,e,i,omega,Omega, t_p, ax, color, label):
+        p = a * (1 - e**2)
+        nu = np.arange(-np.pi, np.pi,.01)
+        r = p / (1 + e * np.cos(nu))
+        P_hat_vec,Q_hat_vec,W_hat_vec = self.calc_PQW_from_orbital_elems(a,e,i,omega,Omega,t_p)
+
+        x = r*np.cos(nu)*P_hat_vec[0] + r*np.sin(nu)*Q_hat_vec[0]
+        y = r*np.cos(nu)*P_hat_vec[1] + r*np.sin(nu)*Q_hat_vec[1]
+        z = r*np.cos(nu)*P_hat_vec[2] + r*np.sin(nu)*Q_hat_vec[2]
+
+        # fig = plt.figure()
+        # ax = fig.add_subplot(111,projection = '3d')
         ax.set_xlabel("x")
         ax.set_ylabel("y")
         ax.set_zlabel("z")
-        ax.plot(x,y,z,color = col)
-        ax.view_init(elev=0, azim=70)
+        ax.plot(x,y,z,label = label,color = color)
+        ax.scatter(0,0,0,"o",label="center",color = "green")
+        # ax.view_init(elev=0, azim=70)
+        plt.legend()
 
     # def rotation_matrix_ijk2PQW(self, i, omega, Omega):
     #     m1 = self.rotation_matrix_1axis(omega, 'z')
@@ -637,13 +662,16 @@ class Planet():
         t_p = JS - M_rad * (a**3/self.mu_sun)**0.5
         return self.calculator.calc_r_v_from_orbital_elems(a,e,i,omega,Omega,t_p,JS)
     
-    def plot_trajectory(self,start_date=(2023,3,3,0,0,0),end_date=(2060,3,3,0,0,0)):
+    def plot_trajectory(self,start_date=(2023,3,3,0,0,0),end_date=(2025,3,3,0,0,0), ax=None):
         start_JS = self.values.convert_times_to_T_TDB(*start_date)[0]
         end_JS = self.values.convert_times_to_T_TDB(*end_date)[0]
         x = np.array([])
         y = np.array([])
-        for i in range(int(start_JS/100000),int(end_JS/100000)):
-            r = self.position_JS(i*100000)[0]
+        for i in range(int(start_JS/1000000),int(end_JS/1000000)):
+            r = self.position_JS(i*1000000)[0]
             x = np.append(x,r[0])
             y = np.append(y,r[1])
-        plt.plot(x,y,"k")
+        if(ax == None):
+            plt.plot(x,y,"g")
+        else:
+            ax.plot(x,y,'g')
