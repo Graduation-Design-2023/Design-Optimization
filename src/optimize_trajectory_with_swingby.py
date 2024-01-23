@@ -30,7 +30,7 @@ earth_mars = PlanetsTransOrbit(earth, mars)
 
 # values for params' domain
 windows = (2040, 1, 1, 0, 0, 0)
-search_period = 2 * 365 * 24 * 60 * 60
+search_period = 5 * 365 * 24 * 60 * 60
 trans_period_max = 5 * 365 * 24 * 60 * 60
 print(windows)
 JS_launch_min = myval.convert_times_to_T_TDB(*windows)[0] - search_period
@@ -67,7 +67,7 @@ xu_array = np.array([JS_launch_max,
 class MyProblem(Problem):
     def __init__(self):
         super().__init__(n_var=13,
-                         n_obj=1,
+                         n_obj=2,
                          n_constr=4,
                          xl=xl_array,
                          xu=xu_array,
@@ -76,6 +76,7 @@ class MyProblem(Problem):
     def _evaluate(self, X, out, *args, **kwargs):
         n = len(X[:,0])
         f1 = np.zeros(n)
+        f2 = np.zeros(n)
         g1 = np.zeros(n)
         g2  = np.zeros(n)
         g3  = np.zeros(n)
@@ -95,14 +96,15 @@ class MyProblem(Problem):
             JS_tcm12 = X[i,12]
             JS_tcm_list = [JS_tcm01, JS_tcm12]
 
-            _, _, _, _, f1[i] = earth_mars.trajectory_with_swingby([mars],arrival_JS_list, v_inf_in_list, [theta], [h], JS_tcm_list)
+            _, _, f2[i], _, f1[i] = earth_mars.trajectory_with_swingby([mars],arrival_JS_list, v_inf_in_list, [theta], [h], JS_tcm_list)
+            f1[i] -= f2[i]
 
             g1[i] = JS_tcm01 - JS_end
             g2[i] = JS_swingby - JS_tcm01
             g3[i] = JS_tcm12 - JS_swingby
             g4[i] = JS_launch - JS_tcm12
 
-        out["F"] = np.column_stack([f1])
+        out["F"] = np.column_stack([f1, f2])
         out["G"] = np.column_stack([g1, g2, g3, g4])
 
 if __name__ == '__main__':
@@ -111,8 +113,8 @@ if __name__ == '__main__':
     
     # アルゴリズムの初期化（NSGA-IIを使用）
     algorithm = NSGA2(
-        pop_size=100,
-        n_offsprings=100,
+        pop_size=1000,
+        n_offsprings=1000,
         sampling=LHS(),
         crossover=SBX(prob=0.9, eta=15),
         mutation=PolynomialMutation(eta=20),
@@ -120,7 +122,7 @@ if __name__ == '__main__':
     )
     
     # 終了条件（40世代）
-    termination = get_termination("n_gen", 60)
+    termination = get_termination("n_gen", 500)
     
     # 最適化の実行
     res = minimize(problem,
@@ -159,4 +161,5 @@ if __name__ == '__main__':
     JS_tcm12 = X[i,12]
     JS_tcm_list = [JS_tcm01, JS_tcm12]
 
-    earth_mars.trajectory_with_swingby([mars],arrival_JS_list, v_inf_in_list, [theta], [h], JS_tcm_list, plot_is_enabled = True)
+    res = earth_mars.trajectory_with_swingby([mars],arrival_JS_list, v_inf_in_list, [theta], [h], JS_tcm_list, plot_is_enabled = True)
+    print(res)
