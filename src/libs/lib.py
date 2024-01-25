@@ -500,6 +500,15 @@ class TrajectoryCalculator():
         R = np.array([[np.cos(-theta_rad), -np.sin(-theta_rad), 0],[np.sin(-theta_rad), np.cos(-theta_rad), 0], [0, 0, 1]])
         r_ecef = np.dot(R, r)
         return r_ecef
+    
+    def ecef2eci(self, r_eci, theta):
+        return self.eci2ecef(r_eci, -theta)
+    
+    def eci2sun(self, r_eci, angle):
+        angle_rad = np.deg2rad(angle)
+        R = np.array([[1,0,0],[0,np.cos(angle_rad), -np.sin(angle_rad)], [0, np.sin(angle_rad), np.cos(angle_rad)]])
+        r_sun = np.dot(R, r_eci)
+        return r_sun
 
     def calc_geodetic_position(self, r_ecef):
         """
