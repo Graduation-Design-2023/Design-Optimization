@@ -1,6 +1,7 @@
 from libs.lib import Values, TrajectoryCalculator, Planet
 import numpy as np
 from matplotlib import pyplot as plt
+import sys
 
 class LambertSolver():
     """
@@ -143,16 +144,18 @@ class LambertSolver():
         a : double
             長半径(km)
         """
-        a = 1.1 * self.a_m
+        a = 1.5 * self.a_m
         n = 0
-        while(np.abs(self.calc_delta_t(a) - self.delta_t) > self.delta_t * 10**(-10)):
-            rho = 1.
+        while(np.abs(self.calc_delta_t(a) - self.delta_t) > self.delta_t * 10**(-5)):
+            # print(a)
+            rho = 0.5
             while(a + rho*(self.delta_t - self.calc_delta_t(a)) / self.calc_d_da_delta_t(a) < self.a_m): #a_m以下にはならないことからステップをつける（あるみほ条件）
                 rho = 0.9*rho
+                n = n + 1
             a = a + rho * (self.delta_t - self.calc_delta_t(a)) / self.calc_d_da_delta_t(a)
             n = n + 1
             if(n > 1000):
-                print("can't calculate",self.t1,self.t2)
+                print("can't calculate",self.is_ellipse)
                 break
         if (not self.is_ellipse):
             a = -a
@@ -431,6 +434,104 @@ class PlanetsTransOrbit():
         delta_v2 = np.linalg.norm(v_planet_end - v_sat_end)
         return nu_1_rad, nu_2_rad,r_start,r_end,v_planet_start,v_planet_end,v_sat_start,v_sat_end
     
+    def trajectory_with_swingby(self, target_planet_list, arrival_JS_list, v_inf_in_list, theta_list, h_list, JS_tcm_list, plot_is_enabled = False):
+        """
+        swingbyを含む軌道を生成する
+        引数---------------------------
+        target_planet_list : n+2 list
+            目標天体とスウィングバイ対象天体のリスト（[目標天体, n回目ののスウィングバイ対象, n-1回目のスウィングバイ対象, ..., 1回目のスウィングバイ対象, 地球]）
+        arrival_time_list : n+2 list
+            目標天体とスウィングバイ対象天体到着時の時刻JS（[目標天体, n回目のスウィングバイ対象, n-1回目のスウィングバイ対象, ..., 地球]）
+        v_inf_in_list : n+1 list
+            目標天体とスウィングバイ対象天体に投入時の無限遠速度（[目標天体, n回目のスウィングバイ対象, n-1回目のスウィングバイ対象, ..., 1回目のスウィングバイ対象]）
+        theta_list : n list
+            スウィングバイ対象天体の衝突平面角（[n回目のスウィングバイ対象, n-1回目のスウィングバイ対象, ..., 1回目のスウィングバイ対象]）
+        h_list : n+1 list
+            スウィングバイ対象天体の最近接距離（[n回目のスウィングバイ対象, n-1回目のスウィングバイ対象, ..., 1回目のスウィングバイ対象]）
+        JS_tcm_list : n+1 list
+            天体間でのTCM時刻（[目標天体とnのスウィングバイ対象間, n回目のスウィングバイ対象とn-1のスウィングバイ対象間, ...]）
+        返り値-----------------------
+        トータルのデルタV
+        """
+        n = len(target_planet_list) -2
+        delta_v_tcm_list = np.zeros(n + 1)
+        delta_v_swingby_list = np.zeros(n)
+        if (plot_is_enabled):
+            fig = plt.figure(figsize=(12,5))
+            ax1 = fig.add_subplot(121,projection = '3d')
+            ax1.set_xlim([-3.5 * 10**8,3.5 * 10**8])
+            ax1.set_ylim([-3.5 * 10**8,3.5 * 10**8])
+            ax1.set_zlim([-3.5 * 10**8,3.5 * 10**8])
+            ax2 = fig.add_subplot(122)
+            ax2.set_xlim([-3.5 * 10**8,3.5 * 10**8])
+            ax2.set_ylim([-3.5 * 10**8,3.5 * 10**8])
+        """
+        index iは目標天体を0として時刻と逆に振っている
+        _i  : i番目のスウィングバイ(i=0は惑星到着)
+        _i_1: i+1番目のスウィングバイ
+        _p  : 惑星の値を表す
+        _bfr: before
+        _aft: after
+        """
+        for i in range(n+1):
+            JS_i = arrival_JS_list[i]
+            planet_i = target_planet_list[i]
+            v_inf_vec_bfr_i = v_inf_in_list[i]
+
+            JS_i_1 = arrival_JS_list[i+1]
+            planet_i_1 = target_planet_list[i+1]
+            JS_tcm = JS_tcm_list[i]
+
+            # arrival at ith target planet
+            r_vec_i, v_p_vec_i = planet_i.position_JS(JS_i)
+            v_vec_bfr_i = v_p_vec_i + v_inf_vec_bfr_i
+            
+            # after tcm
+            r_vec_tcm, v_vec_aft_tcm = self.calculator_sun.calc_r_v_form_r_v_0(r_vec_i, v_vec_bfr_i, JS_i, JS_i_1)
+            _, _, _, _, _, _, p_hat_vec_tcm, q_hat_vec_tcm, _ = self.calculator_sun.calc_orbital_elems_from_r_v(r_vec_tcm, v_vec_aft_tcm, JS_tcm)
+            nu_aft_tcm = self.calculator_sun.calc_nu_from_r_vec(r_vec_tcm, p_hat_vec_tcm, q_hat_vec_tcm)
+            nu_bfr_i = self.calculator_sun.calc_nu_from_r_vec(r_vec_i, p_hat_vec_tcm, q_hat_vec_tcm)
+
+            # start at i+1th target planet
+            r_vec_i_1, v_p_vec_i_1 = planet_i_1.position_JS(JS_i_1)
+
+            # solve lambert from i+1th planet to tcm
+            self.lambert.set_variables(r_vec_i_1, r_vec_tcm, JS_i_1, JS_tcm)
+            _, _, _, nu_aft_i_1_rad, nu_bfr_tcm_rad, v_vec_aft_i_1, v_vec_bfr_tcm = self.lambert.solve_lambert()
+            delta_v_tcm_list[i] = np.linalg.norm(v_vec_aft_tcm - v_vec_bfr_tcm)
+
+            if (i != n):
+                # calc delta-v by i+1th swingby 
+                theta_i_1_rad = np.deg2rad(theta_list[i])
+                rh_i_1 = h_list[i] + planet_i_1.radius
+                v_inf_vec_bfr_i_1 = v_inf_in_list[i+1]
+                _, v_vec_aft_i_1_bfr_tcm, _, _, _ = self.swingby(planet_i_1, theta_i_1_rad, rh_i_1, v_inf_vec_bfr_i_1, JS_i_1)
+                delta_v_swingby_list[i] = np.linalg.norm(v_vec_aft_i_1 - v_vec_aft_i_1_bfr_tcm)
+
+            if (plot_is_enabled):
+                self.calculator_sun.plot_trajectory(r_vec_i_1, v_vec_aft_i_1, JS_i_1, np.rad2deg(nu_aft_i_1_rad),np.rad2deg(nu_bfr_tcm_rad), ax1, projection="3d")
+                self.calculator_sun.plot_trajectory(r_vec_tcm, v_vec_aft_tcm, JS_tcm, nu_aft_tcm, nu_bfr_i, ax1, projection="3d")
+                ax1.plot(r_vec_tcm[0], r_vec_tcm[1], r_vec_tcm[2], '.', color='b')
+                ax1.plot(r_vec_i[0], r_vec_i[1], r_vec_i[2], '.',  color='r')
+                ax1.plot(r_vec_i_1[0], r_vec_i_1[1], r_vec_i_1[2], '.',  color='r')
+
+                self.calculator_sun.plot_trajectory(r_vec_i_1, v_vec_aft_i_1, JS_i_1, np.rad2deg(nu_aft_i_1_rad),np.rad2deg(nu_bfr_tcm_rad), ax2, projection="2d")
+                self.calculator_sun.plot_trajectory(r_vec_tcm, v_vec_aft_tcm, JS_tcm, nu_aft_tcm, nu_bfr_i, ax2, projection="2d")
+                ax2.plot(r_vec_tcm[0], r_vec_tcm[1], '.', color='b')
+                ax2.plot(r_vec_i[0], r_vec_i[1], '.',  color='r')
+                ax2.plot(r_vec_i_1[0], r_vec_i_1[1], '.',  color='r')
+                self.planet_start.plot_trajectory(ax=ax2)
+                self.planet_end.plot_trajectory(ax=ax2)
+
+        delta_v_tcm = np.sum(delta_v_tcm_list)
+        delta_v_swingby = np.sum(delta_v_swingby_list)
+        v_inf_start = np.linalg.norm(v_vec_aft_i_1 - v_p_vec_i_1)
+        v_inf_end = np.linalg.norm(v_inf_in_list[0])
+        if (plot_is_enabled):
+            plt.show()
+        return delta_v_tcm_list, delta_v_swingby_list, v_inf_start, v_inf_end, delta_v_tcm + delta_v_swingby + v_inf_start + v_inf_end
+
+
     def trajectory_with_1TCM(self, time_start, time_end, time_tcm, v_inf_end):
         """
         calc the trajectory which reaches given v_inf_end with 1 TCM
