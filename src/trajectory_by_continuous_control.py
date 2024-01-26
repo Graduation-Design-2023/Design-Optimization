@@ -10,7 +10,7 @@ mars = Planet("Mars")
 
 # 初期条件
 start = (1971, 10, 2, 0, 0, 0)
-tf = 184 * 24 * 60 * 60
+tf = 600 * 24 * 60 * 60
 js_start, _, _ = myval.convert_times_to_T_TDB(*start)
 js_end = js_start + tf
 mu = 1.32712440 * 10**11
@@ -58,7 +58,25 @@ def bcfun(ya, yb):
                     yb[5] - vzf])
     return res
 
-def guess(x):
+def guess_planet_pos(t):
+    re, ve = earth.position_JS(js_start + t)
+    rm, vm = mars.position_JS(js_start + t)
+    weight = t / tf
+    y = np.array([(1 - weight) * re[0][0] + weight * rm[0][0],
+                  (1 - weight) * re[1][0] + weight * rm[1][0],
+                  (1 - weight) * re[2][0] + weight * rm[2][0],
+                  (1 - weight) * ve[0][0] + weight * vm[0][0],
+                  (1 - weight) * ve[1][0] + weight * vm[1][0],
+                  (1 - weight) * ve[2][0] + weight * vm[2][0],
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0])
+    return y
+
+def guess_linear(x):
     y = np.array([(xf - x0) / tf * xi + x0,
                   (yf - y0) / tf * xi + y0,
                   (zf - z0) / tf * xi + z0,
@@ -74,23 +92,30 @@ def guess(x):
     return y
 
 # 数値解の計算
-xmesh = np.linspace(0, tf, 1000)
+xmesh = np.linspace(0, tf, 10000)
 solinit = np.zeros((12, xmesh.size))
 for i, xi in enumerate(xmesh):
-    solinit[:, i] = guess(xi)
+    solinit[:, i] = guess_planet_pos(xi)
 
 sol = solve_bvp(bvpfun, bcfun, xmesh, solinit)
 
 j = sum(sol.y[6]**2 + sol.y[7]**2 + sol.y[8]**2) * xmesh[1]
 print(j)
+plt.plot(sol.y[0], sol.y[1], label='Trajectory')
+plt.plot(solinit[0], solinit[1], label='Trajectory_Guess')
+plt.plot([x0], [y0],'.', color='red', label='Earth')
+plt.plot([xf], [yf],'.', color='green', label='Earth')
+plt.legend()
 # 解のプロット
-fig = plt.figure()
-ax = fig.add_subplot(111, projection="3d")
-ax.plot(sol.y[0], sol.y[1], sol.y[2], label='Trajectory')
-ax.scatter([x0], [y0], [z0], color='red', label='Start')
-ax.scatter([xf], [yf], [zf], color='green', label='End')
-ax.set_xlabel('X')
-ax.set_ylabel('Y')
-ax.set_zlabel('Z')
-ax.legend()
+# fig = plt.figure()
+# ax = fig.add_subplot(111, projection="3d")
+# ax.plot(sol.y[0], sol.y[1], sol.y[2], label='Trajectory')
+# # ax.plot(solinit[0], solinit[1], solinit[2], label='Trajectory')
+# ax.scatter([x0], [y0], [z0], color='red', label='Start')
+# ax.scatter([xf], [yf], [zf], color='green', label='End')
+# ax.set_xlabel('X')
+# ax.set_ylabel('Y')
+# ax.set_zlabel('Z')
+# ax.legend()
 plt.show()
+plt.savefig('a.png')

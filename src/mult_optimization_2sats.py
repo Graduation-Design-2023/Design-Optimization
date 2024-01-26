@@ -121,3 +121,21 @@ if __name__ == "__main__":
     if pf is not None:
         plot.add(pf, plot_type="line", color="red", alpha=0.7)
     plot.show()
+
+    X  = res.X
+    i = 0
+
+    oe_observation1 = (X[i,3], X[i,4], X[i,5], X[i,6], X[i,7], X[i,8])
+    oe_observation2 = (X[i,9], X[i,10], X[i,11], X[i,12], X[i,13], X[i,14])
+    sat1.init_orbit_by_orbital_elems(*oe_observation1)
+    sat2.init_orbit_by_orbital_elems(*oe_observation2)
+    #OccultationCalculator
+    occultation = Occultation(mars,[sat1,sat2])
+
+    dv1, dv1_01, dv1_12, dv1_23 = earth_mars.trajectory_insertion(X[i,0], X[i,1], v_inf_vec, JS0_in, X[i,2], oe_observation1, target_is_perigee, plot_is_enabled=False)
+    dv2, dv2_01, dv2_12, dv2_23 = earth_mars.trajectory_insertion(X[i,0], X[i,1], v_inf_vec, JS0_in, X[i,2], oe_observation2, target_is_perigee, plot_is_enabled=False)
+    print(dv1, dv1_01, dv1_12, dv1_23, dv2, dv2_01, dv2_12, dv2_23)
+
+    longitude_list, latitude_list, count = occultation.simulate_position_observed(0, t0, t_end, dt)
+    plt.plot(longitude_list, latitude_list, '.')
+    plt.show()
