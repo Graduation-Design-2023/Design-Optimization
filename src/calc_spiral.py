@@ -9,17 +9,20 @@ earth = Planet("Earth")
 mars = Planet("Mars")
 
 mu = mars.mu
-mass = 100
-a_theta = -10 * 10**(-3) / mass # はやぶさ 10 mN
-# a_theta = -45 * 10**(-3) / mass # Masmi 45 mN
+mass = 200
+# a_theta = -10 * 10**(-3) / mass # はやぶさ 10 mN
+a_theta = -45 * 10**(-3) / mass # Masmi 45 mN
 # a_theta = -89 * 10**(-3) / mass 
 
 def ivpfun(t, y):
     dydt = np.array([y[1],
                      (y[2]**2) / y[0]**3 - mu / y[0]**2,
                      y[0] * a_theta])
-    if (y[2] < (mu * rp)**0.5):
+    if (y[2] < (mu * rp)**0.5):# fix me
         dydt[2] = 0
+
+    # if (y[2] < 0):
+    #     dydt[2] = 0
     return dydt
 
 v_inf = 0
@@ -35,7 +38,7 @@ span = (0, tf)
 solver = solve_ivp(ivpfun, span, y0, t_eval=np.linspace(*span,1000))
 t = solver.t
 y = solver.y
-ax.plot(t, y[2])
+ax.plot(t, y[0])
 
 plt.show()
 plt.savefig('h.png')

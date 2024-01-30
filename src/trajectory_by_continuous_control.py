@@ -9,8 +9,8 @@ earth = Planet("Earth")
 mars = Planet("Mars")
 
 # 初期条件
-start = (1971, 10, 2, 0, 0, 0)
-tf = 600 * 24 * 60 * 60
+start = (1971, 3, 18, 0, 0, 0)
+tf = 200 * 24 * 60 * 60
 js_start, _, _ = myval.convert_times_to_T_TDB(*start)
 js_end = js_start + tf
 mu = 1.32712440 * 10**11
@@ -106,6 +106,8 @@ plt.plot(solinit[0], solinit[1], label='Trajectory_Guess')
 plt.plot([x0], [y0],'.', color='red', label='Earth')
 plt.plot([xf], [yf],'.', color='green', label='Earth')
 plt.legend()
+# plt.show()
+plt.savefig('a.png')
 # 解のプロット
 # fig = plt.figure()
 # ax = fig.add_subplot(111, projection="3d")
