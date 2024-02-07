@@ -14,3 +14,4 @@ if __name__ == '__main__':
     f2 = np.array(results)[:,1]
     plt.plot(f1,f2,'.',color='r')
     plt.show()
+    plt.savefig('a.png')

@@ -210,14 +210,14 @@ class TrajectoryCalculator():
         r_vec = r * np.cos(nu_rad) * P_hat_vec + r * np.sin(nu_rad) * Q_hat_vec
         return r_vec, v_vec
 
-    def calc_nu_from_r_vec(self, r_vec, P_hat_vec, Q_hat_vec, check_threshold=0.001):
+    def calc_nu_from_r_vec(self, r_vec, P_hat_vec, Q_hat_vec, check_threshold=0.01):
         #fix me
         r_P = np.dot(r_vec.T, P_hat_vec)
         r_Q = np.dot(r_vec.T, Q_hat_vec)
         W_hat_vec = np.cross(P_hat_vec.T, Q_hat_vec.T)
-        if (np.abs(np.dot(W_hat_vec, r_vec)) > check_threshold ):
+        if (np.abs(np.dot(W_hat_vec, r_vec) / np.linalg.norm(r_vec)) > check_threshold ):
             print("plane is invalid")
-            print(np.dot(W_hat_vec, r_vec))
+            # print(np.dot(W_hat_vec, r_vec))
         nu_rad = np.arctan2(r_Q, r_P)
         nu = np.rad2deg(nu_rad)
         return nu
