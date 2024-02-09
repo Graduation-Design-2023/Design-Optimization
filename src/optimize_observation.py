@@ -35,27 +35,19 @@ sat1 = Satellite(mars, receiver_is_avalable=True)
 sat2 = Satellite(mars, receiver_is_avalable=True)
 #vals
 t0 = 0
-t_end = 31 * 24 * 60**2
-dt = 200
-target_is_perigee = True
+t_end = 4 * 24 * 60**2
+dt = 300
 radius = mars.radius
 period = 2 * np.pi / (mars.mu / (radius*2)**3)**0.5
 
-# solve lambert from earth to mars
-windows , t_H = earth_mars.calc_launch_window(2024, 4, 1, 0.001, 1)
-JS_launch, _, _ = myval.convert_times_to_T_TDB(2024, 4, 1, 0, 0, 0)
-duration = t_H
-JS0_in = JS_launch + duration
-_,_,_,_,v_planet_start,v_planet_end,v_sat_start,v_sat_end = earth_mars.trajectory_by_lambert(windows[0], duration)
-v_inf_vec = v_sat_end - v_planet_end
 
-xl_array = np.array([radius, 0, 0, 0, 0, 0, radius, 0, 0, 0, 0, 0])
-xu_array = np.array([radius*20, 1, 180, 360, 360, period, radius*20, 1, 180, 360, 360, period])
+xl_array = np.array([radius, 0, 0, 0, 0, 0, radius, 0, 0,])
+xu_array = np.array([radius*5, 1, 180, 360, 360, period, radius*5, 1, period])
 # ----------------------------
 # X : [theta, r_h, r_a, a1, e1, i1, omega1, Omega1, t_p1, a2, e2, i2, omega2, Omega2, t_p2]
 class MyProblem(Problem):
     def __init__(self):
-        super().__init__(n_var=12,
+        super().__init__(n_var=9,
                          n_obj=1,
                          n_constr=2,
                          xl=xl_array,
@@ -69,16 +61,17 @@ class MyProblem(Problem):
         g2 = np.zeros(n)
         for i in range(0, n):
             oe_observation1 = (X[i,0], X[i,1], X[i,2], X[i,3], X[i,4], X[i,5])
-            oe_observation2 = (X[i,6], X[i,7], X[i,8], X[i,9], X[i,10], X[i,11])
+            oe_observation2 = (X[i,6], X[i,7], X[i,2], X[i,3], X[i,4], X[i,8])
             sat1.init_orbit_by_orbital_elems(*oe_observation1)
             sat2.init_orbit_by_orbital_elems(*oe_observation2)
             #OccultationCalculator
             occultation = Occultation(mars,[sat1,sat2])
             longitude_list, latitude_list, count = occultation.simulate_position_observed(0, t0, t_end, dt)
-            spatial, time = occultation.calc_evaluation(5,5,longitude_list, latitude_list)
-            f1[i] = -count
-            g1[i] = radius - X[i,0] * (1 - X[i,1])
-            g2[i] = radius - X[i,6] * (1 - X[i,7])
+            spatial, time = occultation.calc_evaluation(10,30,longitude_list, latitude_list)
+            f1[i] = -spatial
+            g1[i] = 1.1 * radius - X[i,0] * (1 - X[i,1])
+            g2[i] = 1.1 * radius - X[i,6] * (1 - X[i,7])
+
 
         out["F"] = np.column_stack([f1])
         out["G"] = np.column_stack([g1, g2])
@@ -93,8 +86,8 @@ if __name__ == "__main__":
     
     # アルゴリズムの初期化（NSGA-IIを使用）
     algorithm = NSGA2(
-        pop_size=10,
-        n_offsprings=10,
+        pop_size=100,
+        n_offsprings=100,
         sampling=LHS(),
         crossover=SBX(prob=0.9, eta=15),
         mutation=PolynomialMutation(eta=20),
@@ -102,7 +95,7 @@ if __name__ == "__main__":
     )
     
     # 終了条件（40世代）
-    termination = get_termination("n_gen", 20)
+    termination = get_termination("n_gen", 50)
     
     # 最適化の実行
     res = minimize(problem,
@@ -124,9 +117,9 @@ if __name__ == "__main__":
     if pf is not None:
         plot.add(pf, plot_type="line", color="red", alpha=0.7)
     plot.show()
-    
+
     print(res.X)
-    if (len(res.X) == 12):
+    if (len(res.X) == 9):
         output = np.concatenate([[res.F], [res.X]], axis=1)
     else:
         output = np.concatenate([res.F, res.X], axis=1)
@@ -134,22 +127,21 @@ if __name__ == "__main__":
     with open(file_name, "w") as f:
         json.dump(output.tolist(), f, indent=" ")
 
-    # X  = res.X
-    # if (len(X) == 12):
-    #     X = np.array([X])
-    # i = 0
-    # oe_observation1 = (X[i,0], X[i,1], X[i,2], X[i,3], X[i,4], X[i,5])
-    # oe_observation2 = (X[i,6], X[i,7], X[i,8], X[i,9], X[i,10], X[i,11])
-    # sat1.init_orbit_by_orbital_elems(*oe_observation1)
-    # sat2.init_orbit_by_orbital_elems(*oe_observation2)
-    # #OccultationCalculator
-    # occultation = Occultation(mars,[sat1,sat2])
-    # longitude_list, latitude_list, r1_list, r2_list, time_list = occultation.simulate_position_observed_2sats_detailed(0, t0, t_end, dt)
-    # plt.plot(longitude_list, latitude_list, '.')
-    # plt.show()
-    
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111, projection='3d')
-    # ax.plot(r1_list[0,:], r1_list[1,:], r1_list[2,:])
-    # ax.plot(r2_list[0,:], r2_list[1,:], r2_list[2,:])
-    # plt.show()
+    X  = res.X
+    if (len(X) == 9):
+        X = np.array([X])
+    for i in range(len(X[:,0])):
+        oe_observation1 = (X[i,0], X[i,1], X[i,2], X[i,3], X[i,4], X[i,5])
+        oe_observation2 = (X[i,6], X[i,7], X[i,2], X[i,3], X[i,4], X[i,8])
+        sat1.init_orbit_by_orbital_elems(*oe_observation1)
+        sat2.init_orbit_by_orbital_elems(*oe_observation2)
+        #OccultationCalculator
+        occultation = Occultation(mars,[sat1,sat2])
+        longitude_list, latitude_list, count = occultation.simulate_position_observed(0, t0, t_end, dt)
+        plt.plot(longitude_list, latitude_list, '.')
+        plt.show()
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
+        mars_calculator.plot_trajectory_by_oe(*oe_observation1, ax, 'b', 'sat1')
+        mars_calculator.plot_trajectory_by_oe(*oe_observation2, ax, 'r', 'sat2')
+        plt.show()
