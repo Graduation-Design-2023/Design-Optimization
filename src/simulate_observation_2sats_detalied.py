@@ -30,7 +30,7 @@ venus_calculator = TrajectoryCalculator("Venus")
 theta0 = 0 
 target_planet = mars
 t0 = 0
-t_end = 4 * 31 * 24 * 60**2
+t_end = 3 * 31 * 24 * 60**2
 dt = 50
 #-----------------------------------------
 
@@ -48,7 +48,7 @@ if __name__ == '__main__':
     #     results = json.load(f)
     #     result = results[args.selected_pareto_idx]
 
-    result_file_name = "outputs/runs/20240124173111.json"
+    result_file_name = "outputs/runs/obs.json"
     selected_pareto_idx = 0
     with open(result_file_name, "r") as f:
         results = json.load(f)
@@ -65,12 +65,18 @@ if __name__ == '__main__':
     occultation = Occultation(mars,[sat1,sat2])
 
     ret, min_span_list = occultation.check_requirement_is_satisfied(theta0)
+    min_span_list = np.where(min_span_list <= 0, 100, min_span_list)
     fig, ax = plt.subplots()
     shape = min_span_list.shape
     x_cs = np.array(range(shape[0])) * 360 / shape[0] - 180
     y_cs = np.array(range(shape[1])) * 180 / shape[1] - 90
-    CS = ax.contourf(x_cs, y_cs, min_span_list.T / 60 / 60, np.linspace(0, 6, 7) ,cmap='Greys')
-    cbar = fig.colorbar(CS)
+    im = ax.imshow(min_span_list.T / 60 / 60, cmap='Greys', extent=[-180, 180, -90, 90], origin='lower', vmin=0, vmax=6)
+    cbar = fig.colorbar(im)
+    im.cmap.set_under('black')
+    ax.set_title('observation interval [hour]')
+    ax.set_xlabel('longitude [deg]')
+    ax.set_ylabel('latitude [deg]')
+
     plt.show()
 
     if (ret == False):
@@ -98,7 +104,7 @@ if __name__ == '__main__':
     ax.set_zlabel('z[km]')
     plt.show()
 
-    t_end=24*60*60
+    t_end=6*60*60
     dt = 0.1
     _, _, _, _, time_list, count = occultation.simulate_schedule_2sats(0, t0, t_end=t_end, dt = dt)
     print(count)

@@ -135,7 +135,7 @@ class Occultation():
                 is_occultated_list[i][j] = is_occultated
         return r_h_list, is_occultated_list
     
-    def check_requirement_is_satisfied(self, theta0, t0=0, dt=100, t_end=3*31*24*60*60, grid_width_lon=30, grid_width_lat=30, min_pbs_span=3*60*60, lon_list=None, lat_list=None, time_list=None):
+    def check_requirement_is_satisfied(self, theta0, t0=0, dt=100, t_end=3*31*24*60*60, grid_width_lon=20, grid_width_lat=20, min_pbs_span=3*60*60, lon_list=None, lat_list=None, time_list=None):
         if (lon_list == None):
             lon_list, lat_list, _, _, time_list = self.simulate_position_observed_2sats_detailed(theta0, t0, t_end, dt)
         # plt.plot(lon_list, lat_list, '.')
