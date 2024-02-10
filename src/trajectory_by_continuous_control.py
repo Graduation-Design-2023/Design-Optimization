@@ -2,16 +2,26 @@ from libs.lib import Values, TrajectoryCalculator, Planet
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.integrate import solve_bvp
+import json
+import argparse 
 #Values
 myval = Values()
 #Planet
 earth = Planet("Earth")
 mars = Planet("Mars")
+# ----------------------------
+parser = argparse.ArgumentParser()
+parser.add_argument("result_file_name")
+parser.add_argument("selected_pareto_idx", type=int)
+args = parser.parse_args()
+with open(args.result_file_name, "r") as f:
+    results = json.load(f)
+    result = results[args.selected_pareto_idx]
 
 # 初期条件
-start = (1971, 3, 18, 0, 0, 0)
-tf = 200 * 24 * 60 * 60
-js_start, _, _ = myval.convert_times_to_T_TDB(*start)
+js_start = result[0]
+tf = result[1]
+print('start: ', myval.convert_T_TDB_to_times(js_start))
 js_end = js_start + tf
 mu = 1.32712440 * 10**11
 
