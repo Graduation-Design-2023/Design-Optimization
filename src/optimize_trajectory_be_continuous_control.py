@@ -3,6 +3,9 @@ from libs.lib import Values, TrajectoryCalculator, Planet
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.integrate import solve_bvp
+import os
+import json
+from datetime import datetime
 
 from pymoo.util.misc import stack
 from pymoo.core.problem import Problem
@@ -152,7 +155,7 @@ class Bvp():
 
         sol = solve_bvp(self.bvpfun, self.bcfun, xmesh, solinit)
 
-        j = sum(sol.y[6]**2 + sol.y[7]**2 + sol.y[8]**2) * xmesh[1]
+        j = sum((sol.y[6]**2 + sol.y[7]**2 + sol.y[8]**2)**0.5) * xmesh[1]
         # print(j)
         if (plot_is_enabled):
             plt.plot(sol.y[0], sol.y[1], label='Trajectory')
@@ -167,6 +170,11 @@ class Bvp():
         return j
 
 if __name__ == '__main__':
+    now = datetime.now()
+    folder_name = "outputs/runs"
+    file_name = f"{folder_name}/{now.strftime('%Y%m%d%H%M%S')}.json"
+    os.makedirs(folder_name, exist_ok=True)
+
     problem = MyProblem()
     
     algorithm = NSGA2(
@@ -177,7 +185,7 @@ if __name__ == '__main__':
         mutation=PolynomialMutation(eta=20),
         # eliminate_duplicates=True
     )
-    termination = get_termination("n_gen", 10)
+    termination = get_termination("n_gen", 20)
     
     res = minimize(problem,
                    algorithm,
@@ -191,13 +199,18 @@ if __name__ == '__main__':
     pop = res.pop
     
     # 目的関数空間
-    plot = Scatter(title = "Objective Space", labels = ['j [m^3/s^2]', 'tf [day]'])
-    res.F[:,0] *= 10**6 # km^2 -> m^2
+    plot = Scatter(title = "Objective Space", labels = ['dV [km/s]', 'tf [day]'])
+    # res.F[:,0] *= 10**6 # km^2 -> m^2
     res.F[:,1] /= 24 * 60 * 60 # sec -> day
     plot.add(res.F, color = "red")
-    print(res.X)
+
+    output = np.concatenate([res.F, res.X], axis=1)
+    print(output)
+    with open(file_name, "w") as f:
+        json.dump(output.tolist(), f, indent=" ")
+
     plot.show()
-    plot.save('outputs/runs/objective_space.png')
+    # plot.save('outputs/runs/objective_space.png')
 
     X  = res.X
     i = 0
