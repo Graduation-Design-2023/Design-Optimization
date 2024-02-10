@@ -23,27 +23,30 @@ mars_calclator = TrajectoryCalculator("Mars")
 mu = mars.mu
 
 # params---------------------------------------------------------------------
-rh = 2 * mars.radius
+rh = 10 * mars.radius
+r_max = 5.78 * 10**5 # 火星の重力影響圏
 e0 = 1 - 1e-5
 m0 = 200
-theta0 = - 0.89 * np.pi # 大体スタート点が火星の重力影響圏の5 * 10**5 km
-t_end = 10* 24 * 60 * 60
+t_end = 100* 24 * 60 * 60
 eta = 0
 
 thrust = 45 * 1e-3 * 1e-3 # はやぶさ 10 mN = 10 * 1e-3 * 1e-3 kg km/s^2
 I_sp = 3000
-g = 9.8 * 1e-3 # km/s^2
 # thrust = 45 * 1e-3 * 1e-3 # Masmi 45 mN
 # I_sp = 1733
+# thrust = 89 * 1e-3 * 1e-3 # SPT100
+# I_sp = 1562
+
 w_p = 1
 w_oe = np.array([[5, 5, 10**(-2), 10**(-2), 10**(-2)]]).T
 r_p_min = mars.radius*1.05
 # ---------------------------------------------------------------------------
-
+g = 9.8 * 1e-3 # km/s^2
 # 初期条件
 h0 = (2 * mu * rh)**0.5 
 p0 = h0**2 / mu
 a0 = p0 / (1 - e0**2)
+theta0 = - np.arccos(1 / e0 * (p0 / r_max - 1)) # スタート点が火星の重力影響圏
 
 oe_0 = np.array([[a0, e0, 80, 0.01, 1]]).T # [a, e, i, Omega, omega]
 # oe_0 = np.array([[7829, 0.4018, 30.50, 2.255, 16.75]]).T
@@ -99,7 +102,7 @@ def runge_kutta_1step(func, y, dt):
     return y_next
 
 class Spiral():
-    def __init__(self, w_p, w_oe, r_p_min, oe_0, oe_t, m0, thrust, t_end, eta, dt_initial=0.5, dt_nominal=10, dt_skip=500):
+    def __init__(self, w_p, w_oe, r_p_min, oe_0, oe_t, m0, thrust, t_end, eta, dt_initial=1, dt_nominal=50, dt_skip=500):
         """init
 
         Args:
@@ -129,7 +132,7 @@ class Spiral():
         # fix me
         # dtを変えるロジックについて現在の実装だと遠くから近づくのにだけ対応していて、逆は非対応
         self.dt = dt_initial # 計算量を減らすために途中で変更するので注意
-        self.a_threshold = 5 * 10**5
+        self.a_threshold = 5 * 10**6
         self.num = int(self.t_end / self.dt)
         
         self.oe_his = np.zeros((5,self.num))
