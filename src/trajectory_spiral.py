@@ -27,8 +27,8 @@ rh = 10 * mars.radius
 r_max = 5.78 * 10**5 # 火星の重力影響圏
 e0 = 1 - 1e-5
 m0 = 200
-t_end = 100* 24 * 60 * 60
-eta = 0
+t_end = 1000* 24 * 60 * 60
+eta = 0.001
 
 thrust = 45 * 1e-3 * 1e-3 # はやぶさ 10 mN = 10 * 1e-3 * 1e-3 kg km/s^2
 I_sp = 3000
@@ -37,8 +37,8 @@ I_sp = 3000
 # thrust = 89 * 1e-3 * 1e-3 # SPT100
 # I_sp = 1562
 
-w_p = 1
-w_oe = np.array([[5, 5, 10**(-2), 10**(-2), 10**(-2)]]).T
+w_p = 10
+w_oe = np.array([[4, 2, 10**(-2), 10**(-2), 10**(-2)]]).T
 r_p_min = mars.radius*1.05
 # ---------------------------------------------------------------------------
 g = 9.8 * 1e-3 # km/s^2
@@ -46,13 +46,14 @@ g = 9.8 * 1e-3 # km/s^2
 h0 = (2 * mu * rh)**0.5 
 p0 = h0**2 / mu
 a0 = p0 / (1 - e0**2)
-theta0 = - np.arccos(1 / e0 * (p0 / r_max - 1)) # スタート点が火星の重力影響圏
 
-oe_0 = np.array([[a0, e0, 80, 0.01, 1]]).T # [a, e, i, Omega, omega]
-# oe_0 = np.array([[7829, 0.4018, 30.50, 2.255, 16.75]]).T
-oe_t = np.array([[7000, 0.01, 80, 0.01, 1]]).T 
+# oe_0 = np.array([[16408.770977654727,0.14422248100558563, np.deg2rad(93.60668579389146), np.deg2rad(336.135230751455), np.deg2rad(349.34116942646176)]]).T # [a, e, i, Omega, omega]
+oe_0 = np.array([[a0, e0, np.deg2rad(93.60668579389146), np.deg2rad(336.135230751455), np.deg2rad(349.34116942646176)]]).T # [a, e, i, Omega, omega]
+# oe_t = np.array([[3790.3278315789616, 0.010695693423582661, np.deg2rad(93.60668579389146), np.deg2rad(336.135230751455), np.deg2rad(349.34116942646176)]]).T 
+oe_t = np.array([[16408.770977654727,0.14422248100558563, np.deg2rad(93.60668579389146), np.deg2rad(336.135230751455), np.deg2rad(349.34116942646176)]]).T # [a, e, i, Omega, omega]
 # oe_0 = np.array([[42000, 0.01, 0.050, 0, 0]]).T 
-
+# theta0 = 0
+theta0 = - np.arccos(1 / e0 * (p0 / r_max - 1)) # スタート点が火星の重力影響圏
 now = datetime.now()
 folder_name = "outputs/runs"
 file_name = f"{folder_name}/{now.strftime('%Y%m%d%H%M%S')}.json"
@@ -64,10 +65,11 @@ def main():
     
     r_his = spiral.r_his
     m_his = spiral.m_his
-    dV_his = spiral.dV_his
+    oe_his = spiral.oe_his
     non_zero_index = np.where(m_his != 0)
     m_his = m_his[non_zero_index]
     r_his = r_his[:,non_zero_index][:,0,:]
+    oe_his = oe_his[:,non_zero_index]
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -79,8 +81,7 @@ def main():
     print(dV_tot)
 
     with open(file_name, "w") as f:
-        json.dump(r_his.tolist(), f, indent=" ")
-        json.dump(dV_his.tolist(), f, indent=" ")
+        json.dump([r_his.tolist(), m_his.tolist(), oe_his.tolist()], f, indent=" ")
 
 def runge_kutta_1step(func, y, dt):
     """ルンゲクッタで1ステップ進める
@@ -102,7 +103,7 @@ def runge_kutta_1step(func, y, dt):
     return y_next
 
 class Spiral():
-    def __init__(self, w_p, w_oe, r_p_min, oe_0, oe_t, m0, thrust, t_end, eta, dt_initial=1, dt_nominal=50, dt_skip=500):
+    def __init__(self, w_p, w_oe, r_p_min, oe_0, oe_t, m0, thrust, t_end, eta, dt_initial=1, dt_nominal=10, dt_skip=500):
         """init
 
         Args:
@@ -186,7 +187,7 @@ class Spiral():
                 # 0.001秒停止
                 plt.pause(0.001)
 
-            if (dif / np.dot(self.w_oe.T, self.oe_t)  < 1e-3 ).all():
+            if (dif / np.dot(self.w_oe.T, self.oe_t)  < 1e-5 ).all():
                 print('reach')
                 break
 
@@ -223,21 +224,17 @@ class Spiral():
         d1, d2, d3 = self.d123(oe, theta, f_norm)
         min_dQ_dt, max_dQ_dt = self.min_max_dQ_dt(oe, f_norm)
         dQ_dt = self.dQ_dt(oe, theta, f_norm)
-        if (self.eta != 0):
-            eff = (dQ_dt - max_dQ_dt) / (min_dQ_dt - max_dQ_dt)
-            # print(eff, theta)
+        input = - f_norm * np.array([d2, d1, d3]) / np.linalg.norm([d1, d2, d3])
+        eff = (dQ_dt - max_dQ_dt) / (min_dQ_dt - max_dQ_dt)
 
-            if (eff > self.eta):
-                input = - f_norm * np.array([d2, d1, d3]) / np.linalg.norm([d1, d2, d3])
-                self.dt = self.dt_nominal
-            else:
-                input = 0 * f_norm * np.array([d2, d1, d3]) / np.linalg.norm([d1, d2, d3]) # あんまよくないけど形を保つため
-                self.dt = self.dt_skip
-        else:
-            input = - f_norm * np.array([d2, d1, d3]) / np.linalg.norm([d1, d2, d3])
-        
         if (oe[0] < self.a_threshold):
             self.dt = self.dt_nominal
+        else:
+            self.dt = self.dt_initial
+
+        if (eff < self.eta):
+            input = 0 * input
+            self.dt = self.dt_skip
 
         return input
     
