@@ -44,8 +44,8 @@ def path_time_1day(theta0, t0, dt):
 if __name__ == '__main__':
     t0,_,_ = myval.convert_times_to_T_TDB(2030,1,1,1,1,1)
     theta0 = 0 #シミュレーションスタート時の本初子午線からの角度
-    num = 365*3
-    dt = 1000
+    num = int(365*1.4)
+    dt = 50
     t_list = np.zeros(num)
 
     for i in range(num):
@@ -54,7 +54,7 @@ if __name__ == '__main__':
         theta0 += 24 * 60 * 60 * earth.rotation_omega
 
     plt.plot(np.arange(0,num,1), t_list/60)
-    plt.title('path time')
+    plt.title('visible time')
     plt.xlabel('time [day]')
-    plt.ylabel('available time [min]')
+    plt.ylabel('visible time [min]')
     plt.show()

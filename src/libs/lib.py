@@ -531,7 +531,7 @@ class TrajectoryCalculator():
 
         return longitude, latitude
     
-    def plot_trajectory(self, r_vec, v_vec, JS, nu_start, nu_end, ax, col = 'k', projection="3d"):
+    def plot_trajectory(self, r_vec, v_vec, JS, nu_start, nu_end, ax, col = 'k', projection="3d", width=1.5, label=False):
         """
         plot trajectory from nu_start to nu_end
         input---------------------
@@ -561,14 +561,17 @@ class TrajectoryCalculator():
         z = r*np.cos(nu)*P_hat_vec[2] + r*np.sin(nu)*Q_hat_vec[2]
         r_ref = (x**2 + y**2 + z**2)**0.5
         if (projection == "3d"):
-            ax.set_xlabel("x")
-            ax.set_ylabel("y")
-            ax.set_zlabel("z")
-            ax.plot(x,y,z,color = col)
+            ax.set_xlabel("x[km]")
+            ax.set_ylabel("y[km]")
+            ax.set_zlabel("z[km]")
+            if (not(label)):
+                ax.plot(x,y,z,color = col, linewidth=width)
+            else:
+                ax.plot(x,y,z,color = col, linewidth=width,label=label)
             ax.view_init(elev=0, azim=70)
         else:
-            ax.set_xlabel("x")
-            ax.set_ylabel("y")
+            ax.set_xlabel("x[km]")
+            ax.set_ylabel("y[km]")
             ax.plot(x,y,color = col)
 
     def plot_trajectory_by_oe(self, a,e,i,omega,Omega, t_p, ax, color, label):
@@ -671,7 +674,7 @@ class Planet():
         t_p = JS - M_rad * (a**3/self.mu_sun)**0.5
         return self.calculator.calc_r_v_from_orbital_elems(a,e,i,omega,Omega,t_p,JS)
     
-    def plot_trajectory(self,start_date=(2023,3,3,0,0,0),end_date=(2025,3,3,0,0,0), ax=None):
+    def plot_trajectory(self,start_date=(2023,3,3,0,0,0),end_date=(2025,3,3,0,0,0), ax=None, width=1.5):
         start_JS = self.values.convert_times_to_T_TDB(*start_date)[0]
         end_JS = self.values.convert_times_to_T_TDB(*end_date)[0]
         x = np.array([])
@@ -681,6 +684,6 @@ class Planet():
             x = np.append(x,r[0])
             y = np.append(y,r[1])
         if(ax == None):
-            plt.plot(x,y,"g")
+            plt.plot(x,y,linewidth=width, label=self.planet_name+' orbit')
         else:
-            ax.plot(x,y,'g')
+            ax.plot(x,y,linewidth=width, label=self.planet_name+' orbit')

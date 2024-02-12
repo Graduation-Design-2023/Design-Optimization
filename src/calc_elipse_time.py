@@ -26,7 +26,7 @@ def calc_eclipse_time_from_1angle(sat, sun_angle):
     sun_direction = np.array([[np.cos(sun_angle_rad)], [np.sin(sun_angle_rad)], [0]])
 
     t_end = 2 * np.pi / n
-    dt = 5
+    dt = 1
     num = int(t_end /dt)
     is_eclipsed_list = np.full(num, False)
 
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     #     results = json.load(f)
     #     result = results[args.selected_pareto_idx]
 
-    result_file_name = "outputs/runs/20240124173111.json"
+    result_file_name = "outputs/runs/obs.json"
     selected_pareto_idx = 0
     with open(result_file_name, "r") as f:
         results = json.load(f)

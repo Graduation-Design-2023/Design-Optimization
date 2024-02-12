@@ -21,8 +21,9 @@ earth_mars = PlanetsTransOrbit(earth, mars)
 
 #-------------------------------------------------
 # ここを適切に書き換える（ホントはjsonに保存して読み出したい）
-target_planet_list = [mars,mars,earth,earth]
+target_planet_list = [mars,earth,earth]
 num_swingby = len(target_planet_list) - 2
+result_file_name = 'outputs/runs/inter_planets_determined.json'
 #-------------------------------------------------
 
 # functions for converting X to arguments of trajectory_with_swingby
@@ -38,13 +39,9 @@ def append_X_ndarray3_to_list(list, num_swingby, X_i, j_start):
     return j_start+3*j+2
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("result_file_name")
-    parser.add_argument("selected_pareto_idx", type=int)
-    args = parser.parse_args()
-    with open(args.result_file_name, "r") as f:
+    with open(result_file_name, "r") as f:
         results = json.load(f)
-        result = results[args.selected_pareto_idx]
+        result = results[0]
 
     print(result)
     j = 2
@@ -61,4 +58,7 @@ if __name__ == '__main__':
     j = append_X_scholar_to_list(JS_tcm_list, num_swingby+1, result, j+1)
 
     res = earth_mars.trajectory_with_swingby(target_planet_list, arrival_JS_list, v_inf_in_list, theta_list, h_list, JS_tcm_list, plot_is_enabled = "True")
-    print(res)
+    print('TCM: ', np.sum(res[0]))
+    print('Swingby: ', np.sum(res[1]))
+    print('v_inf_start: ', np.sum(res[2]))
+    print('v_inf_end: ', np.sum(res[3]))

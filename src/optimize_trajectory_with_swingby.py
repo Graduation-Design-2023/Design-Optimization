@@ -34,11 +34,11 @@ earth_mars = PlanetsTransOrbit(earth, mars)
 
 # change below values--------------------------------------------------------------
 # planet used for swingby
-planets_swingby = [mars, mars, mars, earth, earth] # インデックスが小さいほど時間的にあと
+planets_swingby = [mars, earth, earth] # インデックスが小さいほど時間的にあと
 # values for params' domain
 windows = (2040, 1, 1, 0, 0, 0)
-search_period = 5 * 365 * 24 * 60 * 60
-trans_period_max = 5 * 365 * 24 * 60 * 60
+search_period = 7 * 365 * 24 * 60 * 60
+trans_period_max = 1 * 365 * 24 * 60 * 60
 print(windows)
 JS_launch_min = myval.convert_times_to_T_TDB(*windows)[0] - search_period
 JS_launch_max = myval.convert_times_to_T_TDB(*windows)[0] + search_period
@@ -71,11 +71,11 @@ xl_array = np.array(xl_list)
 # make xu list
 xu_list = []
 append_scholar_to_list(xu_list, 1, JS_launch_max)
-append_scholar_to_list(xu_list, num_swingby+1, JS_launch_max+trans_period_max)
+append_scholar_to_list(xu_list, num_swingby+1, JS_launch_max+trans_period_max*num_swingby)
 append_scholar_to_list(xu_list, (num_swingby+1)*3, v_max)
 append_scholar_to_list(xu_list, num_swingby, 360)
 append_scholar_to_list(xu_list, num_swingby, 2 * mars.radius)
-append_scholar_to_list(xu_list, num_swingby+1, JS_launch_max+trans_period_max)
+append_scholar_to_list(xu_list, num_swingby+1, JS_launch_max+trans_period_max*num_swingby)
 xu_array = np.array(xu_list)
 
 
@@ -96,7 +96,7 @@ class MyProblem(Problem):
     def __init__(self):
         super().__init__(n_var=7*num_swingby+6,
                          n_obj=2,
-                         n_constr=2*(num_swingby+1),
+                         n_constr=2*(num_swingby+1)+(num_swingby+1),
                          xl=xl_array,
                          xu=xu_array,
                         )
@@ -106,6 +106,7 @@ class MyProblem(Problem):
         f1 = np.zeros(n)
         f2 = np.zeros(n)
         less_than_0 = np.zeros((n,2*(num_swingby+1)))
+        less_than_0_2 = np.zeros((n,(num_swingby+1)))
 
         for i in range(0, n):
             j = 0
@@ -130,9 +131,10 @@ class MyProblem(Problem):
             JS_tot_list[1::2] = JS_tcm_list
             # [JS_tcm01 - JS_end, JS_swingby0 - JS_tcm01, JS_tcm12 - JS_swingby0, ...]
             less_than_0[i,:] = np.array(JS_tot_list[1:]) - np.array(JS_tot_list[:-1])
+            less_than_0_2[i,:] =  np.array(arrival_JS_list[:-1]) - np.array(arrival_JS_list[1:]) - trans_period_max
 
         out["F"] = np.column_stack([f1, f2])
-        out["G"] = less_than_0
+        out["G"] = np.column_stack([less_than_0, less_than_0_2])
 
 if __name__ == '__main__':
     now = datetime.now()
@@ -154,7 +156,7 @@ if __name__ == '__main__':
     )
     
     # 終了条件（40世代）
-    termination = get_termination("n_gen", 300)
+    termination = get_termination("n_gen", 500)
     
     # 最適化の実行
     res = minimize(problem,
@@ -185,6 +187,8 @@ if __name__ == '__main__':
 
     i = 0
     X = res.X
+    if (len(X) == 7*num_swingby):
+        X = [X]
     j = 0
     arrival_JS_list = [] # num_swingby+2
     v_inf_in_list = [] # 3*(num_swingby+1)

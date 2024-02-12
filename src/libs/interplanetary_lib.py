@@ -155,7 +155,7 @@ class LambertSolver():
             a = a + rho * (self.delta_t - self.calc_delta_t(a)) / self.calc_d_da_delta_t(a)
             n = n + 1
             if(n > 1000):
-                print("can't calculate",self.is_ellipse)
+                # print("can't calculate",self.is_ellipse)
                 break
         if (not self.is_ellipse):
             a = -a
@@ -451,7 +451,11 @@ class PlanetsTransOrbit():
         JS_tcm_list : n+1 list
             天体間でのTCM時刻（[目標天体とnのスウィングバイ対象間, n回目のスウィングバイ対象とn-1のスウィングバイ対象間, ...]）
         返り値-----------------------
-        トータルのデルタV
+        delta_v_tcm_list, 
+        delta_v_swingby_list, 
+        v_inf_start, 
+        v_inf_end, 
+        delta_v_tcm + delta_v_swingby + v_inf_start + v_inf_end
         """
         n = len(target_planet_list) -2
         delta_v_tcm_list = np.zeros(n + 1)
@@ -511,23 +515,24 @@ class PlanetsTransOrbit():
             if (plot_is_enabled):
                 self.calculator_sun.plot_trajectory(r_vec_i_1, v_vec_aft_i_1, JS_i_1, np.rad2deg(nu_aft_i_1_rad),np.rad2deg(nu_bfr_tcm_rad), ax1, projection="3d")
                 self.calculator_sun.plot_trajectory(r_vec_tcm, v_vec_aft_tcm, JS_tcm, nu_aft_tcm, nu_bfr_i, ax1, projection="3d")
-                ax1.plot(r_vec_tcm[0], r_vec_tcm[1], r_vec_tcm[2], '.', color='b')
+                ax1.plot(r_vec_tcm[0], r_vec_tcm[1], r_vec_tcm[2], '.',  label=str(i) + 'th TCM')
                 ax1.plot(r_vec_i[0], r_vec_i[1], r_vec_i[2], '.',  color='r')
                 ax1.plot(r_vec_i_1[0], r_vec_i_1[1], r_vec_i_1[2], '.',  color='r')
 
                 self.calculator_sun.plot_trajectory(r_vec_i_1, v_vec_aft_i_1, JS_i_1, np.rad2deg(nu_aft_i_1_rad),np.rad2deg(nu_bfr_tcm_rad), ax2, projection="2d")
                 self.calculator_sun.plot_trajectory(r_vec_tcm, v_vec_aft_tcm, JS_tcm, nu_aft_tcm, nu_bfr_i, ax2, projection="2d")
-                ax2.plot(r_vec_tcm[0], r_vec_tcm[1], '.', color='b')
+                ax2.plot(r_vec_tcm[0], r_vec_tcm[1], '.',label=str(i) + 'th TCM')
                 ax2.plot(r_vec_i[0], r_vec_i[1], '.',  color='r')
                 ax2.plot(r_vec_i_1[0], r_vec_i_1[1], '.',  color='r')
-                self.planet_start.plot_trajectory(ax=ax2)
-                self.planet_end.plot_trajectory(ax=ax2)
 
         delta_v_tcm = np.sum(delta_v_tcm_list)
         delta_v_swingby = np.sum(delta_v_swingby_list)
         v_inf_start = np.linalg.norm(v_vec_aft_i_1 - v_p_vec_i_1)
         v_inf_end = np.linalg.norm(v_inf_in_list[0])
         if (plot_is_enabled):
+            self.planet_start.plot_trajectory(ax=ax2, width = 1)
+            self.planet_end.plot_trajectory(ax=ax2, width = 1)
+            plt.legend(loc='upper left')
             plt.show()
         return delta_v_tcm_list, delta_v_swingby_list, v_inf_start, v_inf_end, delta_v_tcm + delta_v_swingby + v_inf_start + v_inf_end
 
@@ -881,10 +886,9 @@ class PlanetsTransOrbit():
         # 親機子機一緒
         r_01_vec, r_12_vec, v0_end_vec, v1_start_vec, v1_end_vec, nu1_start, nu1_end, JS0_end, JS1_end = self.trajectory_insertion01(theta, r_h, v_in_vec, JS0_start, r_a_planetary, oe_observation_d)
         r_23_vec, v2_start_vec, v2_end_vec, nu2_start, nu2_end, JS2_end = self.trajectory_insertion12(oe_observation_d, r_12_vec, JS1_end, target_is_perigee)
-        # 子機のみ
         v3_start_vec_d, nu3_start_d = self.trajectory_insertion23(oe_observation_d, r_23_vec, v2_end_vec, JS2_end, target_is_perigee)
         # 親機のみ
-        r_12_vec_p, v1_end_vec_p, _, nu1_end_p, _, JS1_end_p = self.trajectory_trans01_for_parent(oe_observation_p, r_23_vec, v2_end_vec, JS2_end) #dVなし
+        r_12_vec_p, v1_end_vec_p, _, nu1_end_p, _, JS1_end_p = self.trajectory_trans01_for_parent(oe_observation_p, r_23_vec, v3_start_vec_d, JS2_end) #dVなし
         r_23_vec_p, v2_start_vec_p, v2_end_vec_p, nu2_start_p, nu2_end_p, JS2_end_p = self.trajectory_insertion12(oe_observation_p, r_12_vec_p, JS1_end_p, target_is_perigee)
         v3_start_vec_p, nu3_start_p = self.trajectory_insertion23(oe_observation_p, r_23_vec_p, v2_end_vec_p, JS2_end_p, target_is_perigee)
         
@@ -896,35 +900,34 @@ class PlanetsTransOrbit():
         
         a_d, e_d, _, _, _, _ = oe_observation_d
         a_p, e_p, _, _, _, _ = oe_observation_p
-        if (a_d * (1 - e_d) < self.planet_end.radius + 300):
-            delta_v23_d = 0
-        if (a_p * (1 - e_p) < self.planet_end.radius + 300):
-            delta_v23_p = 0
         
-        delta_v_tot_p = delta_v01 + delta_v12 + delta_v12_p + delta_v23_p
-        delta_v_tot_d = delta_v23_d
+        delta_v_tot_p = delta_v01 + delta_v12 + delta_v12_p + delta_v23_p + delta_v23_d
 
         if (plot_is_enabled):
             fig = plt.figure()
             ax = fig.add_subplot(111,projection = '3d')
             ax.plot(r_12_vec[0],r_12_vec[1],r_12_vec[2], '.')
-            self.calculator_end.plot_trajectory(r_01_vec, v0_end_vec, JS0_start, -80, 0, ax)
-            self.calculator_end.plot_trajectory(r_01_vec, v1_start_vec, JS0_end, nu1_start, nu1_end, ax, 'g')
+            self.calculator_end.plot_trajectory(r_01_vec, v0_end_vec, JS0_start, -130, 0, ax, label='insertion')
+            self.calculator_end.plot_trajectory(r_01_vec, v1_start_vec, JS0_end, nu1_start, nu1_end, ax, 'g', label='capture')
             # self.calculator_end.plot_trajectory(r_12_vec, v1_end_vec, JS0_end, nu1_start, nu1_end, ax, 'k')
             # self.calculator_end.plot_trajectory(r_12_vec, v2_start_vec, JS1_end, nu2_start, nu2_end, ax, 'r')
             self.calculator_end.plot_trajectory(r_23_vec, v2_end_vec, JS2_end, nu2_start, nu2_start+359, ax, 'r')
             self.calculator_end.plot_trajectory(r_23_vec, v3_start_vec_d, JS2_end, nu3_start_d, nu3_start_d+359, ax, 'b')
-            self.calculator_end.plot_trajectory(r_12_vec_p, v2_start_vec_p, JS2_end_p, nu2_start_p, nu2_end_p, ax, 'r')
-            self.calculator_end.plot_trajectory(r_23_vec_p, v3_start_vec_p, JS2_end_p, nu3_start_p, nu3_start_p+359, ax, 'b')
+            self.calculator_end.plot_trajectory(r_12_vec_p, v2_start_vec_p, JS2_end_p, nu2_start_p, nu2_end_p, ax, 'r',label='transition')
+            self.calculator_end.plot_trajectory(r_23_vec_p, v3_start_vec_p, JS2_end_p, nu3_start_p, nu3_start_p+359, ax, 'b',label='observation')
+            plt.legend(loc='upper left')
             plt.show()
-            print(delta_v01, delta_v12, delta_v12_p, delta_v23_p, delta_v_tot_d)
-            print(delta_v_tot_p, delta_v_tot_d)
+            print('delta_v01, delta_v12, delta_v12_p, delta_v23_p, delta_v_tot_p')
+            print(delta_v01, delta_v12, delta_v12_p, delta_v23_p, delta_v_tot_p)
             plt.savefig('a.png')
 
-        return delta_v_tot_p, delta_v_tot_d
+        return delta_v_tot_p
 
     def trajectory_trans01_for_parent(self, oe_observation_p, r_01_vec, v1_start_vec, JS0_end):
         a1, e1, i1, omega1, Omega1, t_p1, P_hat1_vec, Q_hat1_vec, W_hat1_vec = self.calculator_end.calc_orbital_elems_from_r_v(r_01_vec, v1_start_vec, JS0_end)
-        r_12_vec , v1_end_vec, nu1_end = self.calc_point_where_change_plane(oe_observation_p, r_01_vec, v1_start_vec, JS0_end)
+        r_12_vec = P_hat1_vec * (a1 * (1 - e1))
+        v1_end_vec = Q_hat1_vec * (self.planet_end.mu * (1 + e1) / a1 / (1 - e1))**0.5
+        nu1_end = 0
+        # r_12_vec , v1_end_vec, nu1_end = self.calc_point_where_change_plane(oe_observation_p, r_01_vec, v1_start_vec, JS0_end)
         JS1_end = self.calculator_end.calc_time_from_r_vec(r_12_vec, P_hat1_vec, Q_hat1_vec, a1, e1, t_p1)
         return r_12_vec, v1_end_vec, 0, nu1_end, JS0_end, JS1_end
