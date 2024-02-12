@@ -2,7 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import json
 # file_name = "outputs/runs/insertion2deploy.json"
-file_name = "outputs/runs/deploy2obs.json"
+file_name = "outputs/runs/insertion.json"
 
 I_sp = 3000
 g = 9.8 * 1e-32434

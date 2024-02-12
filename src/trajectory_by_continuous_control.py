@@ -10,18 +10,15 @@ myval = Values()
 earth = Planet("Earth")
 mars = Planet("Mars")
 # ----------------------------
-parser = argparse.ArgumentParser()
-parser.add_argument("result_file_name")
-parser.add_argument("selected_pareto_idx", type=int)
-args = parser.parse_args()
-with open(args.result_file_name, "r") as f:
+result_file_name = 'outputs/runs/insertion_determined.json'
+with open(result_file_name, "r") as f:
     results = json.load(f)
-    result = results[args.selected_pareto_idx]
+    result = results[0]
 
 # 初期条件
-js_start = result[0]
-tf = result[1]
-print('start: ', myval.convert_T_TDB_to_times(js_start))
+js_start = result[2]
+tf = result[3]
+print('start: ', myval.convert_JD_to_times(js_start / (24 * 60 * 60)))
 js_end = js_start + tf
 mu = 1.32712440 * 10**11
 
@@ -114,20 +111,17 @@ print(j)
 plt.plot(sol.y[0], sol.y[1], label='Trajectory')
 plt.plot(solinit[0], solinit[1], label='Trajectory_Guess')
 plt.plot([x0], [y0],'.', color='red', label='Earth')
-plt.plot([xf], [yf],'.', color='green', label='Earth')
+plt.plot([xf], [yf],'.', color='green', label='Mars')
+plt.xlabel('x [km]')
+plt.ylabel('y [km]')
 plt.legend()
-# plt.show()
-plt.savefig('a.png')
-# 解のプロット
-# fig = plt.figure()
-# ax = fig.add_subplot(111, projection="3d")
-# ax.plot(sol.y[0], sol.y[1], sol.y[2], label='Trajectory')
-# # ax.plot(solinit[0], solinit[1], solinit[2], label='Trajectory')
-# ax.scatter([x0], [y0], [z0], color='red', label='Start')
-# ax.scatter([xf], [yf], [zf], color='green', label='End')
-# ax.set_xlabel('X')
-# ax.set_ylabel('Y')
-# ax.set_zlabel('Z')
-# ax.legend()
 plt.show()
-plt.savefig('a.png')
+
+plt.plot(xmesh, sol.y[6]*10**3,label=r'$a_x [m/s^2]$')
+plt.plot(xmesh, sol.y[7]*10**3,label=r'$a_y [m/s^2]$')
+plt.plot(xmesh, sol.y[8]*10**3,label=r'$a_z [m/s^2]$')
+plt.plot(xmesh, (sol.y[6]**2 + sol.y[7]**2 + sol.y[8]**2)**0.5*10**3,label=r'$|a| [m/s^2]$')
+plt.plot(xmesh, np.array([1]*len(xmesh)) * 89 * 1e-3 / 180, label='max thrust', color='k')
+plt.plot(xmesh, -np.array([1]*len(xmesh)) * 89 * 1e-3 / 180, label='min thrust', color='k')
+plt.legend()
+plt.show()

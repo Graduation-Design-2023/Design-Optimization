@@ -24,6 +24,7 @@ earth = Planet("Earth")
 mars = Planet("Mars")
 
 mu = 1.32712440 * 10**11
+f_max = 89 * 1e-6 / 200
 
 # ----------------------------
 # X : [js_start, tf]
@@ -156,6 +157,8 @@ class Bvp():
         sol = solve_bvp(self.bvpfun, self.bcfun, xmesh, solinit)
 
         j = sum((sol.y[6]**2 + sol.y[7]**2 + sol.y[8]**2)**0.5) * xmesh[1]
+        # if ((sol.y[6]**2 + sol.y[7]**2 + sol.y[8]**2)**0.5 > f_max).any():
+        #     j = 1000000000000
         # print(j)
         if (plot_is_enabled):
             plt.plot(sol.y[0], sol.y[1], label='Trajectory')
@@ -185,7 +188,7 @@ if __name__ == '__main__':
         mutation=PolynomialMutation(eta=20),
         # eliminate_duplicates=True
     )
-    termination = get_termination("n_gen", 20)
+    termination = get_termination("n_gen", 10)
     
     res = minimize(problem,
                    algorithm,
